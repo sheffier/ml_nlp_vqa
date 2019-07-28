@@ -7,15 +7,16 @@ from util import text_processing
 from collections import Counter
 
 vocab_answer_file = './answers_vqa.txt'
-annotation_file = '../vqa_dataset/Annotations/mscoco_%s_annotations.json'
-question_file = '../vqa_dataset/Questions/OpenEnded_mscoco_%s_questions.json'
+# annotation_file = '../vqa_dataset/Annotations/mscoco_%s_annotations.json'
+annotation_file = r'C:\Users\user\Desktop\University\TAU\year1\NLP\project\exp\%sAnnotationsForSNMN.json'
+question_file = r'C:\Users\user\Desktop\University\TAU\year1\NLP\project\exp\%sQuestionsForSNMN.json'
 gt_layout_file = './gt_layout_%s_new_parse.npy'
 
 image_dir = '../coco_dataset/images/%s/'
 feature_dir = './resnet152_c5_7x7/%s/'
 
 answer_dict = text_processing.VocabDict(vocab_answer_file)
-valid_answer_set = set(answer_dict.word_list)
+valid_answer_set = {"true", "false"}
 
 
 def extract_answers(q_answers):
@@ -35,11 +36,11 @@ def build_imdb(image_set):
     print('building imdb %s' % image_set)
     if image_set in ['train2014', 'val2014']:
         load_answer = True
-        load_gt_layout = True
+        load_gt_layout = False
         with open(annotation_file % image_set) as f:
             annotations = json.load(f)["annotations"]
             qid2ann_dict = {ann['question_id']: ann for ann in annotations}
-        qid2layout_dict = np.load(gt_layout_file % image_set)[()]
+        qid2layout_dict = np.load(gt_layout_file % image_set,allow_pickle=True)[()]
     else:
         load_answer = False
         load_gt_layout = False
@@ -57,7 +58,7 @@ def build_imdb(image_set):
             print('processing %d / %d' % (n_q+1, len(questions)))
         image_id = q['image_id']
         question_id = q['question_id']
-        image_name = image_name_template % image_id
+        image_name = q['image_name']
         image_path = os.path.join(abs_image_dir, image_name + '.jpg')
         feature_path = os.path.join(abs_feature_dir, image_name + '.npy')
         question_str = q['question']
@@ -94,13 +95,16 @@ def build_imdb(image_set):
 
 
 imdb_train2014 = build_imdb('train2014')
-imdb_val2014 = build_imdb('val2014')
-imdb_test2015 = build_imdb('test2015')
-imdb_test_dev2015 = build_imdb('test-dev2015')
+#imdb_val2014 = build_imdb('val2014')
+#imdb_test2015 = build_imdb('test2015')
+#imdb_test_dev2015 = build_imdb('test-dev2015')
 
-os.makedirs('./imdb_r152_7x7', exist_ok=True)
+try:
+    os.makedirs('./imdb_r152_7x7')
+except:
+    pass
 np.save('./imdb_r152_7x7/imdb_train2014.npy', np.array(imdb_train2014))
-np.save('./imdb_r152_7x7/imdb_val2014.npy', np.array(imdb_val2014))
-np.save('./imdb_r152_7x7/imdb_trainval2014.npy', np.array(imdb_train2014+imdb_val2014))
-np.save('./imdb_r152_7x7/imdb_test2015.npy', np.array(imdb_test2015))
-np.save('./imdb_r152_7x7/imdb_test-dev2015.npy', np.array(imdb_test_dev2015))
+#np.save('./imdb_r152_7x7/imdb_val2014.npy', np.array(imdb_val2014))
+#np.save('./imdb_r152_7x7/imdb_trainval2014.npy', np.array(imdb_train2014+imdb_val2014))
+#np.save('./imdb_r152_7x7/imdb_test2015.npy', np.array(imdb_test2015))
+#np.save('./imdb_r152_7x7/imdb_test-dev2015.npy', np.array(imdb_test_dev2015))
