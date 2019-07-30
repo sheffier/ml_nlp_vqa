@@ -1,4 +1,4 @@
-EXP_NAME: nlvr_scratch
+EXP_NAME: nlvr
 MODEL:
   H_FEAT: 7
   W_FEAT: 7
