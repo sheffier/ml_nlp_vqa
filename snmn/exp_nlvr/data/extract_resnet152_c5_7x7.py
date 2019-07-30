@@ -18,7 +18,7 @@ gpu_id = args.gpu_id  # set GPU id to use
 os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu_id)
 
 resnet152_model = '../tfmodel/resnet/resnet_v1_152.tfmodel'
-image_basedir = '../coco_dataset/images/'
+image_basedir = '../nlvr_dataset/images/'
 save_basedir = './resnet152_c5_7x7/'
 H = 448
 W = 448
@@ -58,11 +58,10 @@ def extract_dataset_resnet152_c5_7x7(image_dir, save_dir, ext_filter='*.png'):
             resnet152_c5_val = extract_image_resnet152_c5_7x7(impath)
             np.save(save_path, resnet152_c5_val)
 
-
-for image_set in ['train2014', 'val2014', 'test2015']:
+print(image_basedir)
+for image_set in ['train', 'dev', 'test']:
     print('Extracting image set ' + image_set)
     extract_dataset_resnet152_c5_7x7(
         os.path.join(image_basedir, image_set),
-        os.path.join(save_basedir, image_set),
-        ext_filter='*.jpg')
+        os.path.join(save_basedir, image_set))
     print('Done.')
