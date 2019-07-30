@@ -56,7 +56,7 @@ for imageName in tqdm(os.listdir(inputDir), file=sys.stdout):
     im_concat = Image.new('RGB', (2 * desired_single_w, desired_single_h))
     im_concat.paste(im1, (0, 0))
     im_concat.paste(im2, (desired_single_w, 0))
-    im_concat = im_concat.resize((desired_concat_size, desired_concat_size), Image.ANTIALIAS)
+    #im_concat = im_concat.resize((desired_concat_size, desired_concat_size), Image.ANTIALIAS)
     outPath = os.path.join(outputDir, imageName.replace("-img0", ""))
     # print("Writing\t", imageName.replace("-img0", ""))
     im_concat.save(outPath)
