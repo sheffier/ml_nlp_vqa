@@ -1,4 +1,4 @@
-EXP_NAME: vqa_v2_scratch
+EXP_NAME: nlvr_scratch
 MODEL:
   H_FEAT: 7
   W_FEAT: 7
@@ -25,9 +25,9 @@ TRAIN:
   VQA_SCORE_INIT: -8.  # roughly sigmoid(-8) = 1/3000
   SNAPSHOT_INTERVAL: 2500
 TEST:
-  EVAL_FILE: './exp_vqa/eval_outputs_vqa_v2/%s/vqa_v2_OpenEnded_mscoco_%s_%s_%s_results.json'
-  SPLIT_VQA: 'test2015'
+  EVAL_FILE: './exp_nlvr/eval_outputs_nlvr/%s/nlvr_OpenEnded_mscoco_%s_%s_%s_results.json'  # TODO rename file?
+  SPLIT_VQA: 'test'
 
 USE_FIXED_WORD_EMBED: True
-FIXED_WORD_EMBED_FILE: './exp_vqa/data/vocabulary_vqa_glove.npy'
-IMDB_FILE: './exp_vqa/data/imdb_r152_7x7_vqa_v2/imdb_v2_%s.npy'
+FIXED_WORD_EMBED_FILE: './exp_nlvr/data/vocabulary_nlvr_glove.npy'
+IMDB_FILE: './exp_nlvr/data/imdb_r152_7x7/imdb_%s.npy'
