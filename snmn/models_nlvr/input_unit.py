@@ -24,7 +24,7 @@ def build_input_unit(input_seq_batch, seq_length_batch, num_vocab,
         # word embedding
         embed_dim = cfg.MODEL.EMBED_DIM
         if cfg.USE_FIXED_WORD_EMBED:
-            embed_mat = to_T(np.load(cfg.FIXED_WORD_EMBED_FILE))
+            embed_mat = to_T(np.load(cfg.FIXED_WORD_EMBED_FILE, allow_pickle=True))
         else:
             embed_mat = tf.get_variable(
                 'embed_mat', [num_vocab, embed_dim],

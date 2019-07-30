@@ -34,7 +34,7 @@ class BatchLoaderVqa:
         self.load_soft_score = False
 
         # load one feature map to peek its size
-        feats = np.load(self.imdb[0]['feature_path'])
+        feats = np.load(self.imdb[0]['feature_path'], allow_pickle=True)
         self.feat_H, self.feat_W, self.feat_D = feats.shape[1:]
 
     def load_one_batch(self, sample_ids):
@@ -67,7 +67,7 @@ class BatchLoaderVqa:
             seq_length = len(question_inds)
             input_seq_batch[:seq_length, n] = question_inds
             seq_length_batch[n] = seq_length
-            image_feat_batch[n:n+1] = np.load(iminfo['feature_path'])
+            image_feat_batch[n:n+1] = np.load(iminfo['feature_path'], allow_pickle=True)
             image_path_list[n] = iminfo['image_path']
             qid_list[n] = iminfo['question_id']
             qstr_list[n] = iminfo['question_str']
@@ -113,7 +113,7 @@ class DataReader:
                  **kwargs):
         print('Loading imdb from %s' % imdb_file)
         if imdb_file.endswith('.npy'):
-            imdb = np.load(imdb_file, allow_pickle=False)
+            imdb = np.load(imdb_file, allow_pickle=True)
         else:
             raise TypeError('unknown imdb format.')
         print('Done')
