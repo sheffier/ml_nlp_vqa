@@ -7,12 +7,10 @@ import os
 sys.path.append('../../')  # NOQA
 from util import text_processing
 
-
 examples_file = '../nlvr_dataset/{set}.json'
 
 image_dir = '../nlvr_dataset/images/%s/'
 feature_dir = './resnet152_c5_7x7/%s/'
-
 
 
 def build_imdb(image_set):
@@ -63,4 +61,5 @@ imdb_test = build_imdb('test')
 os.makedirs('./imdb_r152_7x7', exist_ok=True)
 np.save('./imdb_r152_7x7/imdb_train.npy', np.array(imdb_train))
 np.save('./imdb_r152_7x7/imdb_dev.npy', np.array(imdb_dev))
+np.save('./imdb_r152_7x7/imdb_traindev.npy', np.array(imdb_train + imdb_dev))
 np.save('./imdb_r152_7x7/imdb_test.npy', np.array(imdb_test))
