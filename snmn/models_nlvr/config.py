@@ -80,7 +80,7 @@ __C.MODEL.REC.USE_TXT_ATT = True
 # training options
 # --------------------------------------------------------------------------- #
 __C.TRAIN = AttrDict()
-__C.TRAIN.SPLIT_VQA = 'trainval2014'
+__C.TRAIN.SPLIT_VQA = 'traindev'
 __C.TRAIN.SPLIT_LOC = 'REPLACE_THIS_WITH_GOOGLE_REF_TRAIN'
 __C.TRAIN.BATCH_SIZE = 64
 __C.TRAIN.USE_GT_LAYOUT = True
