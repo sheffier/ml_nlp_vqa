@@ -26,7 +26,7 @@ def build_imdb(image_set):
     print('building imdb %s' % image_set)
     load_answer = True
     assert image_set in ['train', 'dev', 'test']
-    with open(examples_file.format(set=image_set)) as f:
+    with open(examples_file.format(set='test1' if image_set == 'test' else image_set)) as f:
         examples = [json.loads(line) for line in f.readlines() if line]
 
     imdb = [None] * len(examples)
