@@ -8,7 +8,7 @@ sys.path.append('../../')  # NOQA
 from util import text_processing
 
 
-examples_file = './{set}.json'
+examples_file = '../nlvr_dataset/{set}.json'
 
 image_dir = '../nlvr_dataset/images/%s/'
 feature_dir = './resnet152_c5_7x7/%s/'
