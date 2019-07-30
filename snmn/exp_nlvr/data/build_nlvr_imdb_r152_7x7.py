@@ -30,21 +30,22 @@ def build_imdb(image_set):
         if (i + 1) % 10000 == 0:
             print('processing %d / %d' % (i + 1, len(examples)))
 
-        example_id = example['identifier']
+        question_id = example['identifier']
 
-        image_pair_id = image_pair_regex.match(example_id).group(0)
-        image_path = os.path.abspath(os.path.join(image_dir % image_set, f'{image_pair_id}.png'))
-        feature_path = os.path.abspath(os.path.join(feature_dir % image_set, f'{image_pair_id}.npy'))
+        image_id = image_pair_regex.match(question_id).group(0)
+        image_path = os.path.abspath(os.path.join(image_dir % image_set, f'{image_id}.png'))
+        feature_path = os.path.abspath(os.path.join(feature_dir % image_set, f'{image_id}.npy'))
 
-        sentence_str = example['sentence']
-        sentence_tokens = text_processing.tokenize(sentence_str)
+        question_str = example['sentence']
+        question_tokens = text_processing.tokenize(question_str)
 
-        iminfo = dict(image_path=image_path,
-                      image_pair_id=image_pair_id,
-                      example_id=example_id,
+        iminfo = dict(image_name=image_id,
+                      image_path=image_path,
+                      image_id=image_id,
+                      question_id=question_id,
                       feature_path=feature_path,
-                      sentence_str=sentence_str,
-                      sentence_tokens=sentence_tokens)
+                      question_str=question_str,
+                      question_tokens=question_tokens)
 
         # load answers
         if load_answer:

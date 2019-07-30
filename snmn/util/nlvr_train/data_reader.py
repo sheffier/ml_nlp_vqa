@@ -63,14 +63,14 @@ class BatchLoaderVqa:
         for n in range(len(sample_ids)):
             iminfo = self.imdb[sample_ids[n]]
             question_inds = [
-                self.vocab_dict.word2idx(w) for w in iminfo['sentence_tokens']]
+                self.vocab_dict.word2idx(w) for w in iminfo['question_tokens']]
             seq_length = len(question_inds)
             input_seq_batch[:seq_length, n] = question_inds
             seq_length_batch[n] = seq_length
             image_feat_batch[n:n+1] = np.load(iminfo['feature_path'])
             image_path_list[n] = iminfo['image_path']
-            qid_list[n] = iminfo['example_id']
-            qstr_list[n] = iminfo['sentence_str']
+            qid_list[n] = iminfo['question_id']
+            qstr_list[n] = iminfo['question_str']
             if self.load_answer:
                 valid_answers = ["True", "False"]
                 valid_answers_list[n] = valid_answers

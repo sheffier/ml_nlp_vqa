@@ -4,10 +4,10 @@ import json
 import numpy as np
 import tensorflow as tf
 
-from models_vqa.model import Model
-from models_vqa.config import (
+from models_nlvr.model import Model
+from models_nlvr.config import (
     cfg, merge_cfg_from_file, merge_cfg_from_list)
-from util.vqa_train.data_reader import DataReader
+from util.nlvr_train.data_reader import DataReader
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--cfg', required=True)
