@@ -14,13 +14,6 @@ image_dir = '../nlvr_dataset/images/%s/'
 feature_dir = './resnet152_c5_7x7/%s/'
 
 
-def to_bool(bool_str):
-    if bool_str.lower() == "true":
-        return True
-    elif bool_str.lower() == "false":
-        return False
-    raise NotImplementedError(f"{bool_str} can't be decoded.")
-
 
 def build_imdb(image_set):
     print('building imdb %s' % image_set)
@@ -55,7 +48,7 @@ def build_imdb(image_set):
 
         # load answers
         if load_answer:
-            iminfo['answer'] = to_bool(example['label'])
+            iminfo['answer'] = example['label']  # Assumption: answer is always "True"/"False"
 
         imdb[i] = iminfo
 
