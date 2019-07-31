@@ -217,3 +217,8 @@ where `{exp_name}` should be one of `vqa_v2_gt_layout` and `vqa_v2_scratch`. Not
 ## Acknowledgements
 
 The outline of the configuration code (such as `models_clevr_snmn/config.py`) is obtained from the [Detectron](https://github.com/facebookresearch/Detectron) codebase.
+
+
+Train on the NLVR2 dataset:
+export PYTHONPATH=.:$PYTHONPATH
+python exp_nlvr/train_net_nlvr.py --cfg exp_nlvr/cfgs/nlvr.yaml

@@ -9,7 +9,7 @@ from util import text_processing
 
 examples_file = '../nlvr_dataset/{set}.json'
 
-image_dir = '../nlvr_dataset/images/%s/'
+image_dir = '../nlvr_images/images/%s/'
 feature_dir = './resnet152_c5_7x7/%s/'
 
 
