@@ -1,8 +1,10 @@
-import re
-import sys
-import numpy as np
 import json
 import os
+import re
+import sys
+
+import numpy as np
+from tqdm import tqdm
 
 sys.path.append('../../')  # NOQA
 from util import text_processing
@@ -18,17 +20,13 @@ def build_imdb(image_set):
     load_answer = True
     assert image_set in ['train', 'dev', 'test']
     with open(examples_file.format(set='test1' if image_set == 'test' else image_set)) as f:
-        examples = [json.loads(line) for line in f.readlines() if line]
+        examples = [json.loads(line) for line in f if line]
 
-    #imdb = [None] * len(examples)
     imdb = []
 
     image_pair_regex = re.compile(r'^[-\w]+(?=-\d)')
 
-    for i, example in enumerate(examples):
-        if (i + 1) % 10000 == 0:
-            print('processing %d / %d' % (i + 1, len(examples)))
-
+    for example in tqdm(examples, file=sys.stdout):
         question_id = example['identifier']
 
         image_id = image_pair_regex.match(question_id).group(0)
@@ -36,11 +34,11 @@ def build_imdb(image_set):
         feature_path = os.path.abspath(os.path.join(feature_dir % image_set, f'{image_id}.npy'))
 
         if not os.path.isfile(image_path):
-            print("Image Missing:\t",image_path)
+            tqdm.write("Image Missing:\t" + image_path)
             continue
 
         if not os.path.isfile(feature_path):
-            print("Image Features Missing:\t", feature_path)
+            tqdm.write("Image Features Missing:\t" + feature_path)
             continue
 
         question_str = example['sentence']
@@ -56,9 +54,9 @@ def build_imdb(image_set):
 
         # load answers
         if load_answer:
-            iminfo['answer'] = example['label']  # Assumption: answer is always "True"/"False"
+            assert example['label'] in ("True", "False")  # Assumption: answer is always "True"/"False"
+            iminfo['answer'] = example['label']
 
-        #imdb[i] = iminfo
         imdb.append(iminfo)
 
     return imdb
