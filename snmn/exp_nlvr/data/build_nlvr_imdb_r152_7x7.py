@@ -20,7 +20,8 @@ def build_imdb(image_set):
     with open(examples_file.format(set='test1' if image_set == 'test' else image_set)) as f:
         examples = [json.loads(line) for line in f.readlines() if line]
 
-    imdb = [None] * len(examples)
+    #imdb = [None] * len(examples)
+    imdb = []
 
     image_pair_regex = re.compile(r'^[-\w]+(?=-\d)')
 
@@ -33,6 +34,14 @@ def build_imdb(image_set):
         image_id = image_pair_regex.match(question_id).group(0)
         image_path = os.path.abspath(os.path.join(image_dir % image_set, f'{image_id}.png'))
         feature_path = os.path.abspath(os.path.join(feature_dir % image_set, f'{image_id}.npy'))
+
+        if not os.path.isfile(image_path):
+            print("Image Missing:\t",image_path)
+            continue
+
+        if not os.path.isfile(feature_path):
+            print("Image Features Missing:\t", feature_path)
+            continue
 
         question_str = example['sentence']
         question_tokens = text_processing.tokenize(question_str)
@@ -49,7 +58,8 @@ def build_imdb(image_set):
         if load_answer:
             iminfo['answer'] = example['label']  # Assumption: answer is always "True"/"False"
 
-        imdb[i] = iminfo
+        #imdb[i] = iminfo
+        imdb.append(iminfo)
 
     return imdb
 
