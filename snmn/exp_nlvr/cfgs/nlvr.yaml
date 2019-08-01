@@ -29,5 +29,5 @@ TEST:
   SPLIT_VQA: 'test'
 
 USE_FIXED_WORD_EMBED: True
-FIXED_WORD_EMBED_FILE: './exp_nlvr/data/vocabulary_nlvr.npy'
+FIXED_WORD_EMBED_FILE: './exp_nlvr/data/vocabulary_nlvr_glove.npy'
 IMDB_FILE: './exp_nlvr/data/imdb_r152_7x7/imdb_%s.npy'
