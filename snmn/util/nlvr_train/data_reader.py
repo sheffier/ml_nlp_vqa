@@ -72,13 +72,7 @@ class BatchLoaderVqa:
             qid_list[n] = iminfo['question_id']
             qstr_list[n] = iminfo['question_str']
             if self.load_answer:
-                valid_answers = ["True", "False"]
-                valid_answers_list[n] = valid_answers
-                all_answers = valid_answers
-                all_answers_list[n] = all_answers
-                # randomly sample an answer from valid answers
-                answer = np.random.choice(valid_answers)
-                answer_idx = self.answer_dict.word2idx(answer)
+                answer_idx = self.answer_dict.word2idx(iminfo['answer'])
                 answer_label_batch[n] = answer_idx
             if self.load_gt_layout:
                 gt_layout_tokens = iminfo['gt_layout_tokens']

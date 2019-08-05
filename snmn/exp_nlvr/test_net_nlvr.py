@@ -84,7 +84,6 @@ for n_batch, batch in enumerate(data_reader.batches()):
 
     # compute accuracy
     vqa_scores_val = fetch_list_val[0]
-    vqa_scores_val[:, 0] = -1e10  # remove <unk> answer
     vqa_predictions = np.argmax(vqa_scores_val, axis=1)
     if cfg.TEST.GEN_EVAL_FILE:
         qid_list = batch['qid_list']
