@@ -18,13 +18,14 @@ feature_dir = './resnet152_c5_7x7/%s/'
 def build_imdb(image_set):
     print('building imdb %s' % image_set)
     load_answer = True
-    assert image_set in ['train', 'dev', 'test']
-    with open(examples_file.format(set='test1' if image_set == 'test' else image_set)) as f:
+    assert image_set in ['train', 'dev', 'test1']
+    with open(examples_file.format(set=image_set)) as f:
         examples = [json.loads(line) for line in f if line]
 
     imdb = []
 
     image_pair_regex = re.compile(r'^[-\w]+(?=-\d)')
+    max_len = 0
 
     for example in tqdm(examples, file=sys.stdout):
         question_id = example['identifier']
@@ -44,6 +45,9 @@ def build_imdb(image_set):
         question_str = example['sentence']
         question_tokens = text_processing.tokenize(question_str)
 
+        if len(question_tokens) > max_len:
+            max_len = len(question_tokens)
+
         iminfo = dict(image_name=image_id,
                       image_path=image_path,
                       image_id=image_id,
@@ -59,12 +63,14 @@ def build_imdb(image_set):
 
         imdb.append(iminfo)
 
+    print("[%s] Max seq length: %d" % (image_set, max_len))
+
     return imdb
 
 
 imdb_train = build_imdb('train')
 imdb_dev = build_imdb('dev')
-imdb_test = build_imdb('test')
+imdb_test = build_imdb('test1')
 
 os.makedirs('./imdb_r152_7x7', exist_ok=True)
 np.save('./imdb_r152_7x7/imdb_train.npy', np.array(imdb_train))
