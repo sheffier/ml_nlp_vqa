@@ -1,5 +1,6 @@
 import os
 import sys
+import multiprocessing
 
 from tqdm import tqdm
 from PIL import Image, ImageOps
@@ -8,7 +9,32 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 desired_single_h = 530
 desired_single_w = 416
-desired_concat_size = 448
+
+
+def worker(imageName):
+    path1 = os.path.join(inputDir, imageName)
+    path2 = path1.replace("img0", "img1")
+
+    try:
+        im1 = Image.open(path1)
+    except:
+        print("ERROR: can not read image\t", path1)
+        return
+
+    try:
+        im2 = Image.open(path2)
+    except:
+        print("ERROR: can not read image\t", path2)
+        return
+
+    im1 = ResizeSingle(im1, desired_single_h, desired_single_w)
+    im2 = ResizeSingle(im2, desired_single_h, desired_single_w)
+    im_concat = Image.new('RGB', (2 * desired_single_w, desired_single_h))
+    im_concat.paste(im1, (0, 0))
+    im_concat.paste(im2, (desired_single_w, 0))
+    outPath = os.path.join(outputDir, imageName.replace("-img0", ""))
+    # print("Writing\t", imageName.replace("-img0", ""))
+    im_concat.save(outPath)
 
 
 def ResizeSingle(im, h, w):
@@ -33,30 +59,16 @@ if len(sys.argv) != 3:
 inputDir = sys.argv[1]
 outputDir = sys.argv[2]
 
-for imageName in tqdm(os.listdir(inputDir), file=sys.stdout):
+pool = multiprocessing.Pool()
+file_list = []
+
+for imageName in os.listdir(inputDir):
     if imageName[-5] != '0':
         continue
-    path1 = os.path.join(inputDir, imageName)
-    path2 = path1.replace("img0", "img1")
 
-    try:
-        im1 = Image.open(path1)
-    except:
-        print("ERROR: can not read image\t", path1)
-        continue
+    file_list.append(imageName)
 
-    try:
-        im2 = Image.open(path2)
-    except:
-        print("ERROR: can not read image\t", path2)
-        continue
 
-    im1 = ResizeSingle(im1, desired_single_h, desired_single_w)
-    im2 = ResizeSingle(im2, desired_single_h, desired_single_w)
-    im_concat = Image.new('RGB', (2 * desired_single_w, desired_single_h))
-    im_concat.paste(im1, (0, 0))
-    im_concat.paste(im2, (desired_single_w, 0))
-    #im_concat = im_concat.resize((desired_concat_size, desired_concat_size), Image.ANTIALIAS)
-    outPath = os.path.join(outputDir, imageName.replace("-img0", ""))
-    # print("Writing\t", imageName.replace("-img0", ""))
-    im_concat.save(outPath)
+with tqdm(total=len(file_list), file=sys.stdout) as t:
+    for _ in pool.imap_unordered(worker, file_list):
+        t.update(1)
