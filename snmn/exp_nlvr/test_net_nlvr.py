@@ -41,7 +41,7 @@ if cfg.TEST.GEN_EVAL_FILE:
     print('evaluation outputs will be saved to %s' % eval_file)
     os.makedirs(os.path.dirname(eval_file), exist_ok=True)
     answer_word_list = data_reader.batch_loader.answer_dict.word_list
-    assert(answer_word_list[0] == '<unk>')
+    #assert(answer_word_list[0] == '<unk>')
     output_qids_answers = []
 
 # Inputs and model
@@ -88,7 +88,7 @@ for n_batch, batch in enumerate(data_reader.batches()):
     if cfg.TEST.GEN_EVAL_FILE:
         qid_list = batch['qid_list']
         output_qids_answers += [
-            {'question_id': int(qid), 'answer': answer_word_list[p]}
+            {'question_id': qid, 'answer': answer_word_list[p]}
             for qid, p in zip(qid_list, vqa_predictions)]
 
     if data_reader.batch_loader.load_answer:
