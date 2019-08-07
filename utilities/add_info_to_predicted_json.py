@@ -13,19 +13,29 @@ with open(predictions_path, 'r') as f:
     j = json.load(f)
 
 with open(nlvr_json_path, 'r') as f:
-    nlvr = collections.defaultdict(lambda: {})
+    nlvr = {}
     for line in f.readlines():
         q = json.loads(line)
         id = q['identifier']
-        nlvr[id]['sentence'] = q['sentence']
-        nlvr[id]['gt'] = q['label']
+        nlvr[id] = q
 
 for pred in j:
     id = pred['question_id']
+    pred['answer_gt'] = nlvr[id]['label']
+    pred['answer_correct'] = pred['answer_gt'] == pred['answer']
     pred['sentence'] = nlvr[id]['sentence']
-    pred['gt'] = nlvr[id]['gt']
     image_id = re.sub(r'-\d$', '', id)
     pred['path'] = r'/vol/scratch/erez/ml_nlp_vqa/snmn/exp_nlvr/nlvr_images/images/test1/{}.png'.format(image_id)
+
+
+def qid_to_key(qid):
+    parts = qid.split('-')
+    parts = [parts[0]] + [int(part) for part in parts[1::]]
+    return parts[:-2] + [parts[-1], parts[-2]]
+
+
+j = sorted(j, key=lambda pred: qid_to_key(pred['question_id']))
+
 
 with open('results-with-images-and-questions.json', 'w') as f:
     json.dump(j, f, indent=2)
