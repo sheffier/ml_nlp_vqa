@@ -123,7 +123,7 @@ __C.TEST.ITER = -1  # Needs to be supplied
 
 __C.TEST.RESULT_DIR = './exp_nlvr/results/%s/%08d'
 __C.TEST.GEN_EVAL_FILE = True
-__C.TEST.EVAL_FILE = './exp_nlvr/eval_outputs/%s/nlvr_OpenEnded_mscoco_%s_%s_%s_results.json'
+__C.TEST.EVAL_FILE = './exp_nlvr/eval_outputs/%s/nlvr_%s_%s_%s_results.json'
 __C.TEST.VIS_SEPARATE_CORRECTNESS = False
 __C.TEST.NUM_VIS = 0
 __C.TEST.NUM_VIS_CORRECT = 0
