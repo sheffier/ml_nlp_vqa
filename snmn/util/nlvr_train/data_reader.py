@@ -138,7 +138,7 @@ class DataReader:
             if batch is None:
                 assert(self.one_pass)
                 print('data reader: one pass finished')
-                #raise StopIteration()
+                # raise StopIteration()
                 break
             yield batch
 
