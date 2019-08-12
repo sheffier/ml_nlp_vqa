@@ -6,6 +6,7 @@ conda create -n NLP
 conda activate NLP
 conda update --all
 conda install -c anaconda tensorflow-gpu scikit-image pyyaml jupyter
+conda install -c conda-forge tqdm
 conda update --all
  
 mkdir DATASETS && cd DATASETS
