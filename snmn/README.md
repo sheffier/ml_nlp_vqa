@@ -59,7 +59,7 @@ exp_clevr_snmn/clevr_loc_dataset/
 ```
 
 2. Extract visual features from the images and store them on the disk. In our experiments, we extract visual features using ResNet-101 C4 block. Then, construct the "expert layout" from ground-truth functional programs, and build image collections (imdb) for CLEVR (and CLEVR-Ref). These procedures can be down as follows.
-```
+```bash
 ./exp_clevr_snmn/tfmodel/resnet/download_resnet_v1_101.sh  # download ResNet-101
 
 cd ./exp_clevr_snmn/data/
@@ -163,7 +163,7 @@ exp_vqa/coco_dataset/
 
 3. Extract visual features from the images and store them on the disk. In our experiments, we extract visual features using ResNet-152 C5 block. Then, build image collections (imdb) for VQAv1 and VQAv2. These procedures can be down as follows.
 
-```
+```bash
 ./exp_vqa/tfmodel/resnet/download_resnet_v1_152.sh  # Download ResNet-152
 
 cd ./exp_vqa/data/
@@ -222,12 +222,15 @@ The outline of the configuration code (such as `models_clevr_snmn/config.py`) is
 
 ### preprocess
 1. Link to data:
+```bash
 cd exp_nlvr
 ln -s ../../../DATASETS/NLVR_images_concat nlvr_images
 ln -s ../../../DATASETS/nlvr/nlvr2/data nlvr_dataset
-
+```
 
 Train on the NLVR2 dataset:
+```bash
 cd snmn/
 export PYTHONPATH=.:$PYTHONPATH
 python exp_nlvr/train_net_nlvr.py --cfg exp_nlvr/cfgs/nlvr.yaml
+```
