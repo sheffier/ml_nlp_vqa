@@ -1,5 +1,5 @@
 
-cd /vol/scratch && mkdir tal 
+cd /vol/scratch && mkdir $1
 cd scratch
 mkdir .conda && cd .conda && mkdir envs && mkdir pkgs && cd ..
 conda create -n NLP
