@@ -18,7 +18,7 @@ gpu_id = args.gpu_id  # set GPU id to use
 os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu_id)
 
 resnet152_model = '../tfmodel/resnet/resnet_v1_152.tfmodel'
-image_basedir = '../nlvr_dataset/images/'
+image_basedir = '../nlvr_images/images/'
 save_basedir = './resnet152_c5_7x7/'
 H = 448
 W = 448
@@ -45,21 +45,23 @@ def extract_image_resnet152_c5_7x7(impath):
     return resnet152_c5_7x7_val
 
 
-def extract_dataset_resnet152_c5_7x7(image_dir, save_dir, ext_filter='*.png'):
+def extract_dataset_resnet152_c5_7x7(image_dir, save_dir, ext_filter='*-img0.png'):
     image_list = glob(image_dir + '/' + ext_filter)
     os.makedirs(save_dir, exist_ok=True)
 
-    for n_im, impath in enumerate(image_list):
+    for n_im, impath0 in enumerate(image_list):
         if (n_im+1) % 100 == 0:
             print('processing %d / %d' % (n_im+1, len(image_list)))
-        image_name = os.path.basename(impath).split('.')[0]
+        image_name = os.path.basename(impath0).split('.')[0].replace('-img0', '')
         save_path = os.path.join(save_dir, image_name + '.npy')
         if not os.path.exists(save_path):
-            resnet152_c5_val = extract_image_resnet152_c5_7x7(impath)
+            resnet152_c5_val0 = extract_image_resnet152_c5_7x7(impath0)
+            resnet152_c5_val1 = extract_image_resnet152_c5_7x7(impath0.replace('-img0', '-img1'))
+            resnet152_c5_val = np.concatenate([resnet152_c5_val0, resnet152_c5_val1], axis=2)
             np.save(save_path, resnet152_c5_val)
 
 print(image_basedir)
-for image_set in ['train', 'dev', 'test']:
+for image_set in ['train', 'dev', 'test1']:
     print('Extracting image set ' + image_set)
     extract_dataset_resnet152_c5_7x7(
         os.path.join(image_basedir, image_set),

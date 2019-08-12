@@ -1,7 +1,7 @@
-EXP_NAME: nlvr
+EXP_NAME: nlvr_concat_features_horizontally
 MODEL:
   H_FEAT: 7
-  W_FEAT: 7
+  W_FEAT: 14
   FEAT_DIM: 2048
   T_CTRL: 12
   NMN:
