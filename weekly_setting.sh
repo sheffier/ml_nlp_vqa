@@ -27,7 +27,7 @@ for i in {0..99}; do mv $i/* .; done
 
 
 cd ../../..
-git clone https://github.com/sheffier/ml_nlp_vqa.git
+git clone --single-branch --branch two-images-handling/concat-features-horizontally https://github.com/sheffier/ml_nlp_vqa.git
 cd ml_nlp_vqa/snmn/exp_nlvr
 ln -s ../../../DATASETS/NLVR_images nlvr_images
 ln -s ../../../DATASETS/nlvr/nlvr2/data nlvr_dataset
