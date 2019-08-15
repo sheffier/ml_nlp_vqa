@@ -224,8 +224,8 @@ The outline of the configuration code (such as `models_clevr_snmn/config.py`) is
 1. Link to data:
 ```bash
 cd exp_nlvr
-ln -s ../../../DATASETS/NLVR_images_concat nlvr_images
-ln -s ../../../DATASETS/nlvr/nlvr2/data nlvr_dataset
+ln -s ../../../DATASETS/NLVR_images nlvr_images
+./exp_nlvr/tfmodel/resnet/download_resnet_v1_152.sh
 ```
 
 Train on the NLVR2 dataset:
