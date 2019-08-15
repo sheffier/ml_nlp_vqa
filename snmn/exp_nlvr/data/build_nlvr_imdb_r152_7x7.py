@@ -37,7 +37,7 @@ def build_imdb(image_set):
         feature_path = os.path.abspath(os.path.join(feature_dir % image_set, f'{image_id}.npy'))
 
         missing_images = [not os.path.isfile(img) for img in [left_image_path, right_image_path]]
-        if missing_images:
+        if any(missing_images):
             tqdm.write("Image Missing:\t" +
                        ", ".join(["left", "right"][i] for i in range(len(missing_images)) if missing_images[i]))
             continue
