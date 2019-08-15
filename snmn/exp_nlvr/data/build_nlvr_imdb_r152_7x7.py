@@ -31,11 +31,15 @@ def build_imdb(image_set):
         question_id = example['identifier']
 
         image_id = image_pair_regex.match(question_id).group(0)
-        image_path = os.path.abspath(os.path.join(image_dir % image_set, f'{image_id}.png'))
+        images_dir = os.path.abspath(os.path.join(image_dir % image_set))
+        left_image_path = os.path.join(images_dir, f'{image_id}-img0.png')
+        right_image_path = os.path.join(images_dir, f'{image_id}-img1.png')
         feature_path = os.path.abspath(os.path.join(feature_dir % image_set, f'{image_id}.npy'))
 
-        if not os.path.isfile(image_path):
-            tqdm.write("Image Missing:\t" + image_path)
+        missing_images = [not os.path.isfile(img) for img in [left_image_path, right_image_path]]
+        if missing_images:
+            tqdm.write("Image Missing:\t" +
+                       ", ".join(["left", "right"][i] for i in range(len(missing_images)) if missing_images[i]))
             continue
 
         if not os.path.isfile(feature_path):
@@ -49,7 +53,7 @@ def build_imdb(image_set):
             max_len = len(question_tokens)
 
         iminfo = dict(image_name=image_id,
-                      image_path=image_path,
+                      image_path=left_image_path,
                       image_id=image_id,
                       question_id=question_id,
                       feature_path=feature_path,
