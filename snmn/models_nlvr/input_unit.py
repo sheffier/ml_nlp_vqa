@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-from tensorflow import convert_to_tensor as to_T
+from tensorflow import convert_to_tensor as to_T, newaxis as ax
 
 from .config import cfg
 from util.cnn import conv_elu_layer as conv_elu, conv_layer as conv
@@ -62,6 +62,13 @@ def get_positional_encoding(H, W):
     return position_encoding
 
 
+def get_left_right_encoding(H, W):
+    return tf.concat((tf.constant(-1., dtype=tf.float32, shape=(H, W // 2)),
+                      tf.constant(+1., dtype=tf.float32, shape=(H, W // 2))),
+                     axis=1)
+
+
+
 def build_kb_batch(image_feat_batch, scope='kb_batch', reuse=None):
     """
     Concatenation image batch and position encoding batch, and apply a 2-layer
@@ -73,7 +80,7 @@ def build_kb_batch(image_feat_batch, scope='kb_batch', reuse=None):
         kb_batch: [N, H, W, d], tf.float32
     """
 
-    kb_dim = cfg.MODEL.KB_DIM
+    kb_dim = cfg.MODEL.KB_DIM - cfg.MODEL.INPUT.USE_LEFT_RIGHT_ENCODING
     with tf.variable_scope(scope, reuse=reuse):
         if cfg.MODEL.INPUT.USE_L2_NORMALIZATION:
             norm_type = cfg.MODEL.INPUT.L2_NORMALIZATION_TYPE
@@ -88,11 +95,11 @@ def build_kb_batch(image_feat_batch, scope='kb_batch', reuse=None):
             else:
                 raise ValueError('Invalid l2 normalization type: ' + norm_type)
 
-        if cfg.MODEL.INPUT.USE_POSITION_ENCODING:
-            # get positional encoding
-            N = tf.shape(image_feat_batch)[0]
+        # get positional encoding
+        N = tf.shape(image_feat_batch)[0]
+        _, H, W, _ = image_feat_batch.get_shape().as_list()
 
-            _, H, W, _ = image_feat_batch.get_shape().as_list()
+        if cfg.MODEL.INPUT.USE_POSITION_ENCODING:
             position_encoding = to_T(
                 get_positional_encoding(H, W), dtype=tf.float32)
             position_batch = tf.tile(position_encoding, to_T([N, 1, 1, 1]))
@@ -108,4 +115,10 @@ def build_kb_batch(image_feat_batch, scope='kb_batch', reuse=None):
         else:
             kb_batch = conv('conv_no_pe', image_feat_batch, kernel_size=1,
                             stride=1, output_dim=kb_dim)
+
+        if cfg.MODEL.INPUT.USE_LEFT_RIGHT_ENCODING:
+            left_right_encoding = get_left_right_encoding(H, W)
+            left_right_batch = tf.tile(left_right_encoding[ax, :, :, ax], to_T([N, 1, 1, 1]))
+            kb_batch = tf.concat([kb_batch, left_right_batch], axis=3)
+
     return kb_batch
