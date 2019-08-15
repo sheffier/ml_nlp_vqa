@@ -132,8 +132,16 @@ class NMN:
             #   2) elementwise product with KB
             #   3) 1x1 convolution to get attention logits
             c_mapped = fc('fc_c_mapped', c_i, output_dim=cfg.MODEL.KB_DIM)
+
+            best_c = tf.get_variable("best_c", shape=(2, 1, cfg.MODEL.KB_DIM), dtype=tf.float32,
+                                     initializer=tf.constant(1., dtype=tf.float32, shape=(2, cfg.MODEL.KB_DIM)))
+            left_right_att = tf.matmul(best_c, c_mapped)
+            kb_batch_left_right_att = tf.concat((self.kb_batch[:, :, :cfg.MODEL.W_FEAT // 2, :] * left_right_att[0],
+                                                 self.kb_batch[:, :, cfg.MODEL.W_FEAT // 2:, :] * left_right_att[1]),
+                                                axis=2)
+
             elt_prod = tf.nn.l2_normalize(
-                self.kb_batch * c_mapped[:, ax, ax, :], axis=-1)
+                kb_batch_left_right_att * c_mapped[:, ax, ax, :], axis=-1)
             att_out = _1x1conv('conv_att_out', elt_prod, output_dim=1)
 
             # Push to stack
