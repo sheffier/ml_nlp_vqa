@@ -24,6 +24,8 @@ TRAIN:
   VQA_USE_SOFT_SCORE: False
   VQA_SCORE_INIT: 0.
   SNAPSHOT_INTERVAL: 2500
+  START_ITER: 0
+  MAX_ITER: 80000
 TEST:
   EVAL_FILE: './exp_nlvr/eval_outputs_nlvr/%s/nlvr_%s_%s_%s_results.json'
   SPLIT_VQA: 'test'
