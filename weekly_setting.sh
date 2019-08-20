@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
+source ./miniconda3/etc/profile.d/conda.sh
 cd /vol/scratch && mkdir $1
-cd scratch
+cd $1
 mkdir .conda && cd .conda && mkdir envs && mkdir pkgs && cd ..
-conda create -n NLP
+conda create -y -n NLP
 conda activate NLP
-conda update --all
-conda install -c anaconda tensorflow-gpu scikit-image pyyaml jupyter
-conda install -c conda-forge tqdm
-conda update --all
+conda update --all -y
+conda install -y -c anaconda tensorflow-gpu scikit-image pyyaml jupyter
+conda install -y -c conda-forge tqdm
+conda update --all -y
 
 
 mkdir DATASETS && cd DATASETS
@@ -26,7 +27,7 @@ cd images/train
 for i in {0..99}; do mv $i/* .; done
 
 
-cd ../../..
+cd ../../../../
 git clone --single-branch --branch two-images-handling/concat-features-horizontally https://github.com/sheffier/ml_nlp_vqa.git
 cd ml_nlp_vqa/snmn/exp_nlvr
 ln -s ../../../DATASETS/NLVR_images nlvr_images
