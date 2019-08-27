@@ -223,11 +223,11 @@ The outline of the configuration code (such as `models_clevr_snmn/config.py`) is
 ### preprocess
 1. Link to data:
 cd exp_nlvr
-ln -s ../../../DATASETS/NLVR_images_concat nlvr_images
+ln -s ../../../DATASETS/NLVR_images nlvr_images
 ln -s ../../../DATASETS/nlvr/nlvr2/data nlvr_dataset
 
 
 Train on the NLVR2 dataset:
 cd snmn/
-export PYTHONPATH=.:$PYTHONPATH
+export PYTHONPATH=$(pwd):$PYTHONPATH
 python exp_nlvr/train_net_nlvr.py --cfg exp_nlvr/cfgs/nlvr.yaml
