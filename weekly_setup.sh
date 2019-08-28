@@ -73,5 +73,4 @@ then
     date >> "$done_marks/resnet"
 fi
 
-cd $my_full_dir/ml_nlp_vqa/snmn
-export PYTHONPATH=$(pwd):$PYTHONPATH
+echo -e "\e[1;32mWeekly setup successful! \e[0m"
