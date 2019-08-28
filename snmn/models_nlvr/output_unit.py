@@ -5,7 +5,7 @@ from .config import cfg
 from util.cnn import fc_layer as fc, fc_elu_layer as fc_elu, conv_layer as conv
 
 
-def build_output_unit_vqa(q_encoding, m_last, num_choices, apply_dropout,
+def build_output_unit_vqa(q_encoding, m_last, num_choices, dropout_keep_prob,
                           scope='output_unit', reuse=None):
     """
     Apply a 2-layer fully-connected network to predict answers. Apply dropout
@@ -26,8 +26,8 @@ def build_output_unit_vqa(q_encoding, m_last, num_choices, apply_dropout,
                 output_dim=output_dim)
         else:
             fc1 = fc_elu('fc1_wo_q', m_last, output_dim=output_dim)
-        if apply_dropout:
-            fc1 = tf.nn.dropout(fc1, cfg.TRAIN.DROPOUT_KEEP_PROB)
+
+        fc1 = tf.nn.dropout(fc1, dropout_keep_prob)
         fc2 = fc('fc2', fc1, output_dim=num_choices,
                  biases_initializer=tf.constant_initializer(
                     cfg.TRAIN.VQA_SCORE_INIT))
