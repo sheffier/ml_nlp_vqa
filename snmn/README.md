@@ -231,6 +231,6 @@ ln -s ../../../DATASETS/NLVR_images nlvr_images
 Train on the NLVR2 dataset:
 ```bash
 cd snmn/
-export PYTHONPATH=.:$PYTHONPATH
+export PYTHONPATH=$(pwd):$PYTHONPATH
 python exp_nlvr/train_net_nlvr.py --cfg exp_nlvr/cfgs/nlvr.yaml
 ```
