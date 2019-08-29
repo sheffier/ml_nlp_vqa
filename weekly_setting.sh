@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-usage() {
+usage () {
     echo "usage: $0 [[[-g gpu_id] [-e env_name]] | [-h]]"
     exit ${LINENO}
 }
@@ -54,10 +54,11 @@ ensure_done () {
     local task_mark=$1${2:+-$2}
     if [[ -f "$DONE_MARKS/$task_mark" ]]
     then
-        echo -e "\e[1;4m$task_mark\e[0m: Already done - skipping"
+        echo -e "\e[1;4m$task_mark\e[0m: Already done - \e[33mSkipping\e[0m"
     else
-        echo -e "\e[1;4m$task_mark\e[0m: Running"
+        echo -e "\e[1;4m$task_mark\e[0m: \e[34mRunning\e[0m"
         "$@"
+        echo -e "\e[1;4m$task_mark\e[0m: \e[32mFinished\e[0m"
         date >> "$DONE_MARKS/$task_mark"
     fi
 }
@@ -116,11 +117,11 @@ ln -s ../../../DATASETS/nlvr/nlvr2/data nlvr_dataset
 
 extract_and_build_resnet () {
     cd $MY_FULL_DIR/ml_nlp_vqa/snmn
-    bash ./exp_nlvr/tfmodel/resnet/download_resnet_v1_152.sh
+    bash ./exp_nlvr/tfmodel/resnet/download_resnet_v1_152.sh || exit ${LINENO}
     cd exp_nlvr/data
-    python extract_resnet152_c5_7x7.py --gpu_id "$GPU_ID"
-    python build_nlvr_imdb_r152_7x7.py
+    python extract_resnet152_c5_7x7.py --gpu_id "$GPU_ID" || exit ${LINENO}
+    python build_nlvr_imdb_r152_7x7.py || exit ${LINENO}
 }
 ensure_done extract_and_build_resnet
 
-echo -e "\e[1;32mDONE.\e[0m"
+echo -e "\e[1;34mWEEKLY SETUP FINISHED.\e[0m"
