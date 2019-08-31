@@ -1,3 +1,4 @@
+from comet_ml import Experiment
 import argparse
 import os
 import json
@@ -18,10 +19,13 @@ assert cfg.EXP_NAME == os.path.basename(args.cfg).replace('.yaml', '')
 if args.opts:
     merge_cfg_from_list(args.opts)
 
+
+
 # Start session
 os.environ["CUDA_VISIBLE_DEVICES"] = str(cfg.GPU_ID)
 sess = tf.Session(config=tf.ConfigProto(
     gpu_options=tf.GPUOptions(allow_growth=cfg.GPU_MEM_GROWTH)))
+
 
 # Data files
 imdb_file = cfg.IMDB_FILE % cfg.TEST.SPLIT_VQA
@@ -115,6 +119,11 @@ with open(os.path.join(
     print('\nexp: %s, model name/iter = %s, final accuracy on %s = %f (%d / %d)' %
           (cfg.EXP_NAME, cfg.TEST.MODEL_ITER_OR_NAME, cfg.TEST.SPLIT_VQA,
            accuracy, answer_correct, num_questions))
+
     print('exp: %s, model name/iter = %s, final accuracy on %s = %f (%d / %d)' %
           (cfg.EXP_NAME, cfg.TEST.MODEL_ITER_OR_NAME, cfg.TEST.SPLIT_VQA,
            accuracy, answer_correct, num_questions), file=f)
+
+experiment = Experiment(api_key="wZhhsEAf25MNhISJaDP50GDQg", project_name='ml-nlp-vqa')
+
+experiment.log_metric("final accuracy on model name/iter %s" % (cfg.TEST.MODEL_ITER_OR_NAME), accuracy)
