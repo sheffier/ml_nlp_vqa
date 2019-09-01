@@ -1,4 +1,3 @@
-from comet_ml import Experiment
 import argparse
 import os
 import json
@@ -123,7 +122,3 @@ with open(os.path.join(
     print('exp: %s, model name/iter = %s, final accuracy on %s = %f (%d / %d)' %
           (cfg.EXP_NAME, cfg.TEST.MODEL_ITER_OR_NAME, cfg.TEST.SPLIT_VQA,
            accuracy, answer_correct, num_questions), file=f)
-
-experiment = Experiment(api_key="wZhhsEAf25MNhISJaDP50GDQg", project_name='ml-nlp-vqa')
-
-experiment.log_metric("final accuracy on model name/iter %s" % (cfg.TEST.MODEL_ITER_OR_NAME), accuracy)
