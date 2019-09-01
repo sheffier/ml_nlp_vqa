@@ -54,7 +54,7 @@ ensure_done () {
     local task_mark=$1${2:+-$2}
     if [[ -f "$DONE_MARKS/$task_mark" ]]
     then
-        echo -e "\e[1;4m$task_mark\e[0m: Already done - \e[33mSkipping\e[0m"
+        echo -e "\e[1;4m$task_mark\e[0m: \e[33mSkipping\e[0m (already done - \e[97m$DONE_MARKS/$task_mark\e[0m exists)"
     else
         echo -e "\e[1;4m$task_mark\e[0m: \e[34mRunning\e[0m"
         "$@"
