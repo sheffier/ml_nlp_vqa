@@ -1,3 +1,4 @@
+from comet_ml import Experiment
 import argparse
 import os
 import numpy as np
@@ -8,6 +9,8 @@ from models_nlvr.config import (
     cfg, merge_cfg_from_file, merge_cfg_from_list)
 from util.nlvr_train.data_reader import DataReader
 
+experiment = Experiment(api_key="wZhhsEAf25MNhISJaDP50GDQg", project_name='ml-nlp-vqa')
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--cfg', required=True)
 parser.add_argument('opts', default=None, nargs=argparse.REMAINDER)
@@ -17,6 +20,8 @@ assert cfg.EXP_NAME == os.path.basename(args.cfg).replace('.yaml', '')
 if args.opts:
     merge_cfg_from_list(args.opts)
 
+hyper_params = {"batch_size": cfg.TRAIN.BATCH_SIZE, "feature_dim": cfg.MODEL.FEAT_DIM}
+experiment.log_parameters(hyper_params)
 
 # Start session
 os.environ["CUDA_VISIBLE_DEVICES"] = str(cfg.GPU_ID)
@@ -136,6 +141,7 @@ best_val_iter = 0
 avg_accuracy, accuracy_decay = 0., 0.99
 for n_batch, batch in enumerate(data_reader.batches()):
     n_iter = n_batch + cfg.TRAIN.START_ITER
+
     if n_iter >= cfg.TRAIN.MAX_ITER:
         break
 
@@ -184,6 +190,11 @@ for n_batch, batch in enumerate(data_reader.batches()):
                   "accuracy (cur) = %f\n\t" % val_accuracy +
                   "best accuracy = %f at iter %d" % (best_val_acc, best_val_iter))
 
+            experiment.log_metric("[VAL] loss (vqa)", val_avg_loss, step = n_iter)
+            experiment.log_metric("[VAL] accuracy (cur)", val_accuracy, step = n_iter)
+            experiment.log_metric("[VAL] best accuracy", best_val_acc, step = n_iter)
+            experiment.log_metric("[VAL] best val iter", best_val_iter, step = n_iter)
+
             val_avg_loss = 0.
 
     feed_dict = {input_seq_batch: batch['input_seq_batch'],
@@ -213,6 +224,11 @@ for n_batch, batch in enumerate(data_reader.batches()):
                 loss_vqa_val, loss_layout_val, loss_rec_val) +
               "accuracy (cur) = %f, accuracy (avg) = %f" % (
                 accuracy, avg_accuracy))
+
+        experiment.log_metric("[TRAIN] loss (vqa)", loss_vqa_val, step = n_iter)
+        experiment.log_metric("[TRAIN] accuracy (cur)", accuracy, step = n_iter)
+        experiment.log_metric("[TRAIN] accuracy (avg)", avg_accuracy, step = n_iter)
+
         summary = sess.run(log_step_trn, {
             loss_vqa_ph: loss_vqa_val,
             loss_layout_ph: loss_layout_val,
