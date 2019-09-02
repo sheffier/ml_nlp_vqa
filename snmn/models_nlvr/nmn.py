@@ -179,9 +179,9 @@ class NMN:
             # stack_ptr = _move_ptr_bw(stack_ptr)  # cancel-out below
 
             c_mapped = fc('fc_c_mapped', c_i, output_dim=cfg.MODEL.KB_DIM)
-            kb_att_in = _extract_softmax_avg(self.kb_batch, att_in)
+            kb_att_in = _extract_softmax_avg(self.get_kb_attention(c_mapped), att_in)
             elt_prod = tf.nn.l2_normalize(
-                self.kb_batch * c_mapped[:, ax, ax, :] *
+                self.get_kb_attention(c_mapped) * c_mapped[:, ax, ax, :] *
                 kb_att_in[:, ax, ax, :], axis=-1)
             att_out = _1x1conv('conv_att_out', elt_prod, output_dim=1)
 
