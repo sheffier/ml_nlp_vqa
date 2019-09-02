@@ -82,11 +82,25 @@ answer_correct, num_questions = 0, 0
 for n_batch, batch in enumerate(data_reader.batches()):
     fetch_list = [model.vqa_scores]
     answer_incorrect = num_questions - answer_correct
+    if cfg.TEST.VIS_SEPARATE_CORRECTNESS:
+        run_vis = (
+            answer_correct < cfg.TEST.NUM_VIS_CORRECT or
+            answer_incorrect < cfg.TEST.NUM_VIS_INCORRECT)
+    else:
+        run_vis = num_questions < cfg.TEST.NUM_VIS
+    if run_vis:
+        fetch_list.append(model.vis_outputs)
     fetch_list_val = sess.run(fetch_list, feed_dict={
             input_seq_batch: batch['input_seq_batch'],
             seq_length_batch: batch['seq_length_batch'],
             image_feat_batch: batch['image_feat_batch'],
             dropout_keep_prob: 1.0})
+
+    # visualization
+    if run_vis:
+        model.vis_batch_vqa(
+            data_reader, batch, fetch_list_val[-1], num_questions,
+            answer_correct, answer_incorrect, vis_dir)
 
     # compute accuracy
     vqa_scores_val = fetch_list_val[0]

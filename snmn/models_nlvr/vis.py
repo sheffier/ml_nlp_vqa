@@ -44,14 +44,14 @@ def vis_one_vqa(img_path, words, vqa_scores, label, module_names, answers,
     plt.ylabel('controller timestep')
     plt.title('textual attention at controller timestep')
 
-    # scores
-    plt.subplot(5, 3, 4)
-    plt.imshow(vqa_scores[np.newaxis, :], cmap='Reds')
-    plt.xticks(range(len(answers)), answers, rotation=90)
-    plt.yticks([], [])
-    plt.xlabel('answer logits')
-    plt.title('prediction: %s    label: %s' % (
-        answers[np.argmax(vqa_scores)], answers[label]))
+    # # scores
+    # plt.subplot(5, 3, 4)
+    # plt.imshow(vqa_scores[np.newaxis, :], cmap='Reds')
+    # plt.xticks(range(len(answers)), answers, rotation=90)
+    # plt.yticks([], [])
+    # plt.xlabel('answer logits')
+    # plt.title('prediction: %s    label: %s' % (
+    #     answers[np.argmax(vqa_scores)], answers[label]))
 
     plt.subplot(5, 3, 5)
     plt.imshow(stack_ptr.T, cmap='Reds')
@@ -222,10 +222,14 @@ def vis_one_stepwise(img_path, words, module_names, txt_att, att_stack,
                      loc_scores=None, bbox_pred=None, bbox_gt=None):
     T = cfg.MODEL.T_CTRL
     # M = len(module_names)
-    img = skimage.io.imread(img_path)
-    scale_x = 480. / img.shape[1]
+    img_path1 = img_path.replace('img0','img1')
+    img0 = skimage.io.imread(img_path)
+    img1 = skimage.io.imread(img_path1)
+    img0 = skimage.transform.resize(img0, (320, 480))
+    img1 = skimage.transform.resize(img1, (320, 480))
+    img = np.hstack([img0,img1])
+    scale_x = 2 * 480. / img.shape[1]
     scale_y = 320. / img.shape[0]
-    img = skimage.transform.resize(img, (320, 480))
 
     h = plt.figure(figsize=(18, (T+2) * 5))
     if cfg.TEST.VIS_SHOW_IMG:
@@ -277,13 +281,7 @@ def vis_one_stepwise(img_path, words, module_names, txt_att, att_stack,
         if t == 0 and m == '_Filter':
             m_display = 'find'
         else:
-            m_display = m[1:].replace(
-                'Find', 'look_for').replace(
-                'Filter', 'select').replace(
-                'Transform', 'related_by').replace(
-                'DescribeOne', 'Answer').replace(
-                'DescribeTwo', 'Compare_Two').replace(
-                'And', 'Intersect').replace('Or', 'Combine').lower()
+            m_display = m[1:]
         if show_ans and vis_type == 'loc' and \
                 m in {'_NoOp', '_DescribeOne', '_DescribeTwo'}:
             m_display = 'bbox_regression'
@@ -384,7 +382,7 @@ def vis_batch_vqa(model, data_reader, batch, vis_outputs, start_idx,
         words = [
             data_reader.batch_loader.vocab_dict.idx2word(n_w) for n_w in
             batch['input_seq_batch'][:batch['seq_length_batch'][n], n]]
-        vqa_scores = vis_outputs['vqa_scores'][n]
+        vqa_scores = None  # vis_outputs['vqa_scores'][n]
         label = batch['answer_label_batch'][n]
         txt_att = vis_outputs['txt_att'][n]
         att_stack = vis_outputs['att_stack'][n]
@@ -497,7 +495,7 @@ def attention_interpolation(im, att):
     att_reshaped = att_reshaped[..., np.newaxis]
 
     # make the attention area brighter than the rest of the area
-    vis_im = att_reshaped * im + (1-att_reshaped) * im * .45
+    vis_im = att_reshaped * im + (1-att_reshaped) * im * .0
     vis_im = vis_im.astype(im.dtype)
     return vis_im
 
