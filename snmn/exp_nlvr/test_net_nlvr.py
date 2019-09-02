@@ -124,6 +124,6 @@ with open(os.path.join(
           (cfg.EXP_NAME, cfg.TEST.MODEL_ITER_OR_NAME, cfg.TEST.SPLIT_VQA,
            accuracy, answer_correct, num_questions), file=f)
 
-experiment = Experiment(api_key="wZhhsEAf25MNhISJaDP50GDQg", project_name='ml-nlp-vqa')
+experiment = Experiment(api_key="wZhhsEAf25MNhISJaDP50GDQg", project_name=cfg.EXP_NAME)
 
 experiment.log_metric("final accuracy on model name/iter %s" % (cfg.TEST.MODEL_ITER_OR_NAME), accuracy)

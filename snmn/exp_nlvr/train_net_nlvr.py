@@ -9,7 +9,7 @@ from models_nlvr.config import (
     cfg, merge_cfg_from_file, merge_cfg_from_list)
 from util.nlvr_train.data_reader import DataReader
 
-experiment = Experiment(api_key="wZhhsEAf25MNhISJaDP50GDQg", project_name='ml-nlp-vqa')
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--cfg', required=True)
@@ -19,6 +19,8 @@ merge_cfg_from_file(args.cfg)
 assert cfg.EXP_NAME == os.path.basename(args.cfg).replace('.yaml', '')
 if args.opts:
     merge_cfg_from_list(args.opts)
+
+experiment = Experiment(api_key="wZhhsEAf25MNhISJaDP50GDQg", project_name=cfg.EXP_NAME)
 
 hyper_params = {"batch_size": cfg.TRAIN.BATCH_SIZE, "feature_dim": cfg.MODEL.FEAT_DIM}
 experiment.log_parameters(hyper_params)
@@ -168,7 +170,7 @@ for n_batch, batch in enumerate(data_reader.batches()):
             vqa_predictions = np.argmax(vqa_scores_val, axis=1)
 
             answer_correct += np.sum(vqa_predictions == vqa_labels)
-            val_avg_loss += val_loss_vqa
+            val_avg_loss += val_loss_vqa * len(vqa_predictions)
         else:
             val_accuracy = answer_correct / n_val_samples
             val_avg_loss = val_avg_loss / n_val_samples
