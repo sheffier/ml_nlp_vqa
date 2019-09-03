@@ -74,6 +74,7 @@ create_env () {
     conda update --yes --all
     conda install --yes -c anaconda tensorflow tensorflow-gpu scikit-image pyyaml jupyter
     conda install --yes -c conda-forge tqdm
+    pip install comet_ml
     conda update --yes --all
 }
 ensure_done create_env $CONDA_PROJ_ENV
@@ -109,7 +110,7 @@ ensure_done download_dev_images
 ensure_done download_test1_images
 
 cd $MY_FULL_DIR
-git clone --single-branch --branch "$GIT_BRANCH_NAME" https://github.com/sheffier/ml_nlp_vqa.git || ( cd ml_nlp_vqa ; git checkout -t -b $GIT_BRANCH_NAME ; git pull )
+git clone --branch "$GIT_BRANCH_NAME" https://github.com/sheffier/ml_nlp_vqa.git || ( cd ml_nlp_vqa ; git checkout -t -b $GIT_BRANCH_NAME ; git pull )
 
 cd ml_nlp_vqa/snmn/exp_nlvr || exit ${LINENO}
 ln -s ../../../DATASETS/NLVR_images nlvr_images

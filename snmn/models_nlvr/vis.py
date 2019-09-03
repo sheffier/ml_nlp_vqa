@@ -349,6 +349,8 @@ def vis_batch_vqa(model, data_reader, batch, vis_outputs, start_idx,
                   start_idx_correct, start_idx_incorrect, vis_dir):
     module_names = model.nmn.module_names
     answers = data_reader.batch_loader.answer_dict.word_list
+    sample_ids = batch['sample_ids']
+    imdb = data_reader.imdb
     if cfg.TEST.VIS_SEPARATE_CORRECTNESS:
         num_correct = max(cfg.TEST.NUM_VIS_CORRECT-start_idx_correct, 0)
         num_incorrect = max(cfg.TEST.NUM_VIS_INCORRECT-start_idx_incorrect, 0)
@@ -359,10 +361,11 @@ def vis_batch_vqa(model, data_reader, batch, vis_outputs, start_idx,
         inds = (list(np.where(is_correct)[0][:num_correct]) +
                 list(np.where(~is_correct)[0][:num_incorrect]))
     else:
-        num = min(len(batch['image_path_list']), cfg.TEST.NUM_VIS - start_idx)
+        num = min(len(sample_ids), cfg.TEST.NUM_VIS - start_idx)
         inds = range(num)
     for n in inds:
-        img_path = batch['image_path_list'][n]
+        iminfo = imdb[sample_ids[n]]
+        img_path = iminfo['image_path']
         if cfg.TEST.VIS_SEPARATE_CORRECTNESS:
             if is_correct[n]:
                 save_name = 'correct_%08d_%s.png' % (
@@ -403,6 +406,8 @@ def vis_batch_loc(model, data_reader, batch, vis_outputs, start_idx,
                   start_idx_correct, start_idx_incorrect, vis_dir):
     module_names = model.nmn.module_names
     iou_th = cfg.TEST.BBOX_IOU_THRESH
+    sample_ids = batch['sample_ids']
+    imdb = data_reader.imdb
     if cfg.TEST.VIS_SEPARATE_CORRECTNESS:
         num_correct = max(cfg.TEST.NUM_VIS_CORRECT-start_idx_correct, 0)
         num_incorrect = max(cfg.TEST.NUM_VIS_INCORRECT-start_idx_incorrect, 0)
@@ -418,10 +423,11 @@ def vis_batch_loc(model, data_reader, batch, vis_outputs, start_idx,
         inds = (list(np.where(is_correct)[0][:num_correct]) +
                 list(np.where(~is_correct)[0][:num_incorrect]))
     else:
-        num = min(len(batch['image_path_list']), cfg.TEST.NUM_VIS - start_idx)
+        num = min(len(sample_ids), cfg.TEST.NUM_VIS - start_idx)
         inds = range(num)
     for n in inds:
-        img_path = batch['image_path_list'][n]
+        iminfo = imdb[sample_ids[n]]
+        img_path = iminfo['image_path']
         if cfg.TEST.VIS_SEPARATE_CORRECTNESS:
             if is_correct[n]:
                 save_name = 'correct_%08d_%s.png' % (

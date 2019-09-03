@@ -1,13 +1,15 @@
 import threading
 import queue
+import random
 import numpy as np
 
 from util import text_processing
 
 
 class BatchLoaderVqa:
-    def __init__(self, imdb, data_params):
+    def __init__(self, imdb, is_mask_tokens, data_params):
         self.imdb = imdb
+        self.is_mask_tokens = is_mask_tokens
         self.data_params = data_params
 
         self.vocab_dict = text_processing.VocabDict(
@@ -37,21 +39,56 @@ class BatchLoaderVqa:
         feats = np.load(self.imdb[0]['feature_path'], allow_pickle=True)
         self.feat_H, self.feat_W, self.feat_D = feats.shape[1:]
 
+    @staticmethod
+    def random_word(tokens, out_labels, vocab_dict):
+        # input_seq = []
+        # output_label = []
+
+        for i, token in enumerate(tokens):
+            # token_idx = vocab_dict.word2idx(token)
+            prob = random.random()
+            # mask token with probability
+            ratio = 0.15  # args.word_mask_rate
+            if prob < ratio:
+                prob /= ratio
+
+                # 80% randomly change token to mask token
+                if prob < 0.8:
+                    # input_seq.append(vocab_dict.MASK_idx)
+                    tokens[i] = vocab_dict.MASK_idx
+
+                # 10% randomly change token to random token
+                elif prob < 0.9:
+                    # input_seq.append(random.randrange(vocab_dict.num_vocab + 1))
+                    tokens[i] = random.randrange(vocab_dict.num_vocab + 1)
+                # else: # -> rest 10% randomly keep current token
+                #     input_seq.append(token_idx)
+
+                # out_labels[i] = token_idx
+                out_labels[i] = token
+                # output_label.append(token_idx)
+            # else:
+            #     # no masking token (will be ignored by loss function later)
+            #     input_seq.append(token_idx)
+            #     # output_label.append(-1)
+
+        # return input_seq  # , output_label
+
     def load_one_batch(self, sample_ids):
         actual_batch_size = len(sample_ids)
-        input_seq_batch = np.zeros(
+        input_seq_batch = np.empty(
             (self.T_encoder, actual_batch_size), np.int32)
-        seq_length_batch = np.zeros(actual_batch_size, np.int32)
-        image_feat_batch = np.zeros(
+        if self.is_mask_tokens:
+            output_seq_batch = np.ones(
+                (self.T_encoder, actual_batch_size), np.int32) * -1
+        seq_length_batch = np.empty(actual_batch_size, np.int32)
+        image_feat_batch = np.empty(
             (actual_batch_size, self.feat_H, self.feat_W, self.feat_D),
             np.float32)
-        image_path_list = [None]*actual_batch_size
-        qid_list = [None]*actual_batch_size
-        qstr_list = [None]*actual_batch_size
         if self.load_answer:
-            answer_label_batch = np.zeros(actual_batch_size, np.int32)
-            valid_answers_list = [None]*actual_batch_size
-            all_answers_list = [None]*actual_batch_size
+            answer_label_batch = np.empty(actual_batch_size, np.int32)
+            # valid_answers_list = [None]*actual_batch_size
+            # all_answers_list = [None]*actual_batch_size
             if self.load_soft_score:
                 num_choices = len(self.answer_dict.word_list)
                 soft_score_batch = np.zeros(
@@ -62,15 +99,9 @@ class BatchLoaderVqa:
 
         for n in range(len(sample_ids)):
             iminfo = self.imdb[sample_ids[n]]
-            question_inds = [
-                self.vocab_dict.word2idx(w) for w in iminfo['question_tokens']]
-            seq_length = len(question_inds)
-            input_seq_batch[:seq_length, n] = question_inds
+            seq_length = len(iminfo['question_tokens'])
             seq_length_batch[n] = seq_length
             image_feat_batch[n:n+1] = np.load(iminfo['feature_path'], allow_pickle=True)
-            image_path_list[n] = iminfo['image_path']
-            qid_list[n] = iminfo['question_id']
-            qstr_list[n] = iminfo['question_str']
             if self.load_answer:
                 answer_idx = self.answer_dict.word2idx(iminfo['answer'])
                 answer_label_batch[n] = answer_idx
@@ -88,22 +119,37 @@ class BatchLoaderVqa:
                     self.layout_dict.word2idx(w) for w in gt_layout_tokens]
                 gt_layout_batch[:len(layout_inds), n] = layout_inds
 
+            input_seq_batch[:, n] = iminfo['question_tokens']
+            if self.is_mask_tokens:
+                # question_inds, question_labels = self.random_word(iminfo['question_tokens'], self.vocab_dict)
+                # output_seq_batch[:seq_length, n] = question_labels
+
+                self.random_word(input_seq_batch[:seq_length, n],
+                                 output_seq_batch[:seq_length, n],
+                                 self.vocab_dict)
+            # else:
+            #     question_inds = [
+            #         self.vocab_dict.word2idx(w) for w in iminfo['question_tokens']]
+
+            # input_seq_batch[:seq_length, n] = question_inds
+
         batch = dict(input_seq_batch=input_seq_batch,
                      seq_length_batch=seq_length_batch,
                      image_feat_batch=image_feat_batch,
-                     image_path_list=image_path_list,
-                     qid_list=qid_list, qstr_list=qstr_list)
+                     sample_ids=sample_ids)
+        if self.is_mask_tokens:
+            batch['output_seq_batch'] = output_seq_batch
         if self.load_answer:
             batch['answer_label_batch'] = answer_label_batch
-            batch['valid_answers_list'] = valid_answers_list
-            batch['all_answers_list'] = all_answers_list
+            # batch['valid_answers_list'] = valid_answers_list
+            # batch['all_answers_list'] = all_answers_list
         if self.load_gt_layout:
             batch['gt_layout_batch'] = gt_layout_batch
         return batch
 
 
 class DataReader:
-    def __init__(self, imdb_file, shuffle=True, one_pass=False, prefetch_num=8,
+    def __init__(self, imdb_file, shuffle=True, one_pass=False, prefetch_num=8, is_mask_tokens=False,
                  **kwargs):
         print('Loading imdb from %s' % imdb_file)
         if imdb_file.endswith('.npy'):
@@ -115,10 +161,11 @@ class DataReader:
         self.shuffle = shuffle
         self.one_pass = one_pass
         self.prefetch_num = prefetch_num
+        self.is_mask_tokens = is_mask_tokens
         self.data_params = kwargs
 
         # Vqa data loader
-        self.batch_loader = BatchLoaderVqa(self.imdb, self.data_params)
+        self.batch_loader = BatchLoaderVqa(self.imdb, self.is_mask_tokens, self.data_params)
 
         # Start prefetching thread
         self.prefetch_queue = queue.Queue(maxsize=self.prefetch_num)

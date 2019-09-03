@@ -106,10 +106,12 @@ for n_batch, batch in enumerate(data_reader.batches()):
     vqa_scores_val = fetch_list_val[0]
     vqa_predictions = np.argmax(vqa_scores_val, axis=1)
     if cfg.TEST.GEN_EVAL_FILE:
-        qid_list = batch['qid_list']
-        output_qids_answers += [
-            {'question_id': qid, 'answer': answer_word_list[p]}
-            for qid, p in zip(qid_list, vqa_predictions)]
+        sample_ids = batch['sample_ids']
+        qids_answers = []
+        for sample_id, prediction in zip(sample_ids, vqa_predictions):
+            iminfo = data_reader.batch_loader.imdb[sample_id]
+            qid = iminfo['question_id']
+            qids_answers.append({'question_id': qid, 'answer': answer_word_list[prediction]})
 
     if data_reader.batch_loader.load_answer:
         vqa_labels = batch['answer_label_batch']

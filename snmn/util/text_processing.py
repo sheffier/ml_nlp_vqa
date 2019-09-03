@@ -24,6 +24,9 @@ class VocabDict:
         self.UNK_idx = (
             self.word2idx_dict['<unk>'] if '<unk>' in self.word2idx_dict
             else None)
+        self.MASK_idx = (
+            self.word2idx_dict['<mask>'] if '<mask>' in self.word2idx_dict
+            else None)
 
     def idx2word(self, n_w):
         return self.word_list[n_w]
