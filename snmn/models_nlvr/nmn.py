@@ -48,7 +48,7 @@ class NMN:
             self.att_shape = to_T([self.N, self.H, self.W, 1])
 
             self.stack_len = cfg.MODEL.NMN.STACK.LENGTH
-            # The initialial stack values are all zeros everywhere
+            # The initial stack values are all zeros everywhere
             self.att_stack_init = tf.zeros(
                 to_T([self.N, self.H, self.W, self.stack_len]))
             # The initial stack pointer points to the stack bottom
@@ -151,7 +151,6 @@ class NMN:
             #   3) 1x1 convolution to get attention logits
             c_mapped = fc('fc_c_mapped', c_i, output_dim=cfg.MODEL.KB_DIM)
 
-
             elt_prod = tf.nn.l2_normalize(
                 self.get_kb_attention(c_mapped) * c_mapped[:, ax, ax, :], axis=-1)
             att_out = _1x1conv('conv_att_out', elt_prod, output_dim=1)
@@ -179,9 +178,10 @@ class NMN:
             # stack_ptr = _move_ptr_bw(stack_ptr)  # cancel-out below
 
             c_mapped = fc('fc_c_mapped', c_i, output_dim=cfg.MODEL.KB_DIM)
-            kb_att_in = _extract_softmax_avg(self.get_kb_attention(c_mapped), att_in)
+            kb_attention = self.get_kb_attention(c_mapped)
+            kb_att_in = _extract_softmax_avg(kb_attention, att_in)
             elt_prod = tf.nn.l2_normalize(
-                self.get_kb_attention(c_mapped) * c_mapped[:, ax, ax, :] *
+                self.kb_batch * c_mapped[:, ax, ax, :] *
                 kb_att_in[:, ax, ax, :], axis=-1)
             att_out = _1x1conv('conv_att_out', elt_prod, output_dim=1)
 
@@ -320,6 +320,7 @@ class NMN:
                 att_stack, stack_ptr = att_stack_old, stack_ptr_old
 
         return att_stack, stack_ptr, mem_out
+
 
 def _move_ptr_fw(stack_ptr):
     """
