@@ -79,6 +79,7 @@ class NMN:
                 # stack underflow or overflow. e.g. _Filter can't be run at
                 # t = 0 since the stack is empty).
                 if cfg.MODEL.NMN.VALIDATE_MODULES:
+                    # TODO prob of NoOp module considering left/right prob
                     module_validity = tf.matmul(
                         stack_ptr_prev, self.module_validity_mat)
                     if cfg.MODEL.NMN.HARD_MODULE_VALIDATION:
@@ -118,21 +119,6 @@ class NMN:
                 self.att_stack_list[-1], self.stack_ptr_list[-1])
             self.mem_last = self.mem_list[-1]
 
-    def get_kb_attention(self, c_mapped):
-        return self.kb_batch
-        # TODO
-        N = tf.shape(c_mapped)[0]
-        best_c = tf.get_variable("best_c", shape=(1, cfg.MODEL.KB_DIM, 2), dtype=tf.float32,
-                                 initializer=tf.constant_initializer(1.0))
-        left_right_att = tf.nn.softmax(tf.tensordot(c_mapped, best_c, axes=([1], [1])), axis=2)
-        left_att_broad = tf.broadcast_to(left_right_att[:, :, 0, ax, ax],
-                                         [N, cfg.MODEL.H_FEAT, cfg.MODEL.W_FEAT, cfg.MODEL.KB_DIM])
-        right_att_broad = tf.broadcast_to(left_right_att[:, :, 1, ax, ax],
-                                          [N, cfg.MODEL.H_FEAT, cfg.MODEL.W_FEAT, cfg.MODEL.KB_DIM])
-        left_right_att_broad = tf.concat([left_att_broad, right_att_broad], axis=2)
-        kb_batch_left_right_att = tf.math.multiply(self.kb_batch, left_right_att_broad)
-        return kb_batch_left_right_att
-
     def NoOp(self, att_stack, stack_ptr, mem_in, c_i, scope='NoOp',
              reuse=None):
         """
@@ -154,7 +140,7 @@ class NMN:
             c_mapped = fc('fc_c_mapped', c_i, output_dim=cfg.MODEL.KB_DIM)
 
             elt_prod = tf.nn.l2_normalize(
-                self.get_kb_attention(c_mapped) * c_mapped[:, ax, ax, :], axis=-1)
+                self.kb_batch * c_mapped[:, ax, ax, :], axis=-1)
             att_out = _1x1conv('conv_att_out', elt_prod, output_dim=1)
 
             # Push to stack
@@ -180,8 +166,7 @@ class NMN:
             # stack_ptr = _move_ptr_bw(stack_ptr)  # cancel-out below
 
             c_mapped = fc('fc_c_mapped', c_i, output_dim=cfg.MODEL.KB_DIM)
-            kb_attention = self.get_kb_attention(c_mapped)
-            kb_att_in = _extract_softmax_avg(kb_attention, att_in)
+            kb_att_in = _extract_softmax_avg(self.kb_batch, att_in)
             elt_prod = tf.nn.l2_normalize(
                 self.kb_batch * c_mapped[:, ax, ax, :] *
                 kb_att_in[:, ax, ax, :], axis=-1)

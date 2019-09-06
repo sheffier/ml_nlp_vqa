@@ -87,7 +87,7 @@ class Controller:
                     module_prob = tf.nn.softmax(module_w_l2, axis=1)
                 module_prob_list.append(module_prob)
 
-                left_right_probs = tf.nn.sigmoid(left_right_w_l2, axis=1)
+                left_right_probs = tf.nn.sigmoid(left_right_w_l2)
                 left_right_probs_list.append(left_right_probs)
 
                 elem_prod = tf.reshape(cq_i * lstm_seq, to_T([S*N, dim]))

@@ -39,25 +39,27 @@ class Model:
             left_module_probs, right_module_probs = (tf.identity(self.module_prob_list) for _ in range(2))
             no_op_index = module_names.index('_NoOp')
             for lri, module_probs in enumerate((left_module_probs, right_module_probs)):
-                module_probs *= self.left_right_probs[:, lri]
-                module_probs[:, no_op_index] += 1 - tf.reduce_sum(module_probs, axis=1)
+                module_probs *= self.left_right_probs[:, :, lri]
+                module_probs += (1 - tf.reduce_sum(module_probs, axis=-1, keep_dims=True)
+                                 ) * tf.one_hot([[no_op_index]], depth=module_probs.get_shape()[-1])
 
             self.left_module_prob_list = left_module_probs
             self.right_module_prob_list = right_module_probs
 
             self.nmn_left = nmn.NMN(kb_batch_left, self.c_list, module_names, left_module_probs)
-            self.nmn_right = nmn.NMN(kb_batch_right, self.c_list, module_names, right_module_probs)
+            self.nmn_right = nmn.NMN(kb_batch_right, self.c_list, module_names, right_module_probs, reuse=True)
+            nmns = Aggregate((self.nmn_left, self.nmn_right))
 
             # Output unit
             if cfg.MODEL.BUILD_VQA:
                 self.vqa_scores = output_unit.build_output_unit_vqa(
-                    q_encoding, (self.nmn_left.mem_last, self.nmn_right.mem_last), num_choices,
+                    q_encoding, nmns.mem_last, num_choices,
                     dropout_keep_prob=dropout_keep_prob)
             if cfg.MODEL.BUILD_LOC:
                 raise NotImplementedError
                 loc_scores, bbox_offset, bbox_offset_fcn = \
                     output_unit.build_output_unit_loc(
-                        q_encoding, kb_batch, self.nmn.att_last)
+                        q_encoding, kb_batch, nmns.att_last)
                 self.loc_scores = loc_scores
                 self.bbox_offset = bbox_offset
                 self.bbox_offset_fcn = bbox_offset_fcn
@@ -86,10 +88,10 @@ class Model:
                 'txt_att':  # [N, T, S]
                 tf.transpose(  # [S, N, T] -> [N, T, S]
                     tf.concat(self.controller.cv_list, axis=2), (1, 2, 0)),
-                'att_stack':  # [N, T, H, W, L]
-                tf.stack(self.nmn.att_stack_list, axis=1),
-                'stack_ptr':  # [N, T, L]
-                tf.stack(self.nmn.stack_ptr_list, axis=1),
+                'att_stack':  # [N, T, H, 2W, L]
+                tf.concat(tuple(tf.stack(l, axis=1) for l in nmns.att_stack_list), axis=3),
+                'stack_ptr':  # [N, T, L, 2]  # TODO adapt to separated left/right
+                tf.stack(tuple(tf.stack(l, axis=1) for l in nmns.stack_ptr_list), axis=-1),
                 'module_prob':  # [N, T, D]
                 tf.stack(self.module_prob_list, axis=1)}
             if cfg.MODEL.BUILD_VQA:
@@ -118,3 +120,8 @@ class Model:
 
     def vis_batch_loc(self, *args):
         vis.vis_batch_loc(self, *args)
+
+
+class Aggregate(tuple):
+    def __getattr__(self, item):
+        return Aggregate((getattr(self[0], item), getattr(self[1], item)))

@@ -78,7 +78,7 @@ def build_kb_batch(image_feat_batch, scope='kb_batch', reuse=None):
     right_image_feat_batch = image_feat_batch[:, :, W:, :]
 
     return (build_kb_batch_one_image(left_image_feat_batch, scope, reuse),
-            build_kb_batch_one_image(right_image_feat_batch, scope, reuse))
+            build_kb_batch_one_image(right_image_feat_batch, scope, reuse=True))
 
 
 def build_kb_batch_one_image(image_feat_batch, scope='kb_batch', reuse=None):

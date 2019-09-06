@@ -221,6 +221,8 @@ def vis_one_stepwise(img_path, words, module_names, txt_att, att_stack,
                      vqa_scores=None, label=None, answers=None,
                      loc_scores=None, bbox_pred=None, bbox_gt=None):
     T = cfg.MODEL.T_CTRL
+    W = cfg.MODEL.W_FEAT
+
     # M = len(module_names)
     img_path1 = img_path.replace('img0','img1')
     img0 = skimage.io.imread(img_path)
@@ -318,7 +320,7 @@ def vis_one_stepwise(img_path, words, module_names, txt_att, att_stack,
                 raise ValueError('Unknow vis_type ' + str(vis_type))
         else:
             plt.subplot((T+2)*2, 3, (6*t_disp+9, 6*t_disp+12))
-            att = np.sum(att_stack[t] * stack_ptr[t], axis=-1)
+            att = np.sum(att_stack[t, :, W] * stack_ptr[t, :, 0] + att_stack[t, :, W:] * stack_ptr[t, :, 1], axis=-1)
             img_with_att = attention_interpolation(img, att)
             plt.imshow(img_with_att)
             plt.xticks([], [])
@@ -341,7 +343,7 @@ def vis_one_stepwise(img_path, words, module_names, txt_att, att_stack,
                        'att_stack': att_stack,
                        'stack_ptr': stack_ptr,
                        'module_prob': module_prob},
-                      f, indent=4, encoder=NumpyEncoder)
+                      f, indent=4, cls=NumpyEncoder)
         elif vis_type == 'loc':
             json.dump({'question': question, 'bbox_pred': list(bbox_pred),
                        'bbox_gt': list(bbox_gt)}, f)
@@ -360,7 +362,7 @@ class NumpyEncoder(json.JSONEncoder):
 
 def vis_batch_vqa(model, data_reader, batch, vis_outputs, start_idx,
                   start_idx_correct, start_idx_incorrect, vis_dir):
-    module_names = model.nmn.module_names
+    module_names = model.nmn_left.module_names
     answers = data_reader.batch_loader.answer_dict.word_list
     if cfg.TEST.VIS_SEPARATE_CORRECTNESS:
         num_correct = max(cfg.TEST.NUM_VIS_CORRECT-start_idx_correct, 0)
@@ -414,7 +416,7 @@ def vis_batch_vqa(model, data_reader, batch, vis_outputs, start_idx,
 
 def vis_batch_loc(model, data_reader, batch, vis_outputs, start_idx,
                   start_idx_correct, start_idx_incorrect, vis_dir):
-    module_names = model.nmn.module_names
+    module_names = model.nmn_left.module_names
     iou_th = cfg.TEST.BBOX_IOU_THRESH
     if cfg.TEST.VIS_SEPARATE_CORRECTNESS:
         num_correct = max(cfg.TEST.NUM_VIS_CORRECT-start_idx_correct, 0)
