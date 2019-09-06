@@ -7,8 +7,12 @@ import tensorflow as tf
 
 from models_nlvr.model import Model
 from models_nlvr.config import (
-    cfg, merge_cfg_from_file, merge_cfg_from_list)
+    cfg, merge_cfg_from_file, merge_cfg_from_list, evaluate_final_cfg)
 from util.nlvr_train.data_reader import DataReader
+
+
+tf.logging.set_verbosity(tf.logging.ERROR)
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--cfg', required=True)
@@ -18,8 +22,7 @@ merge_cfg_from_file(args.cfg)
 assert cfg.EXP_NAME == os.path.basename(args.cfg).replace('.yaml', '')
 if args.opts:
     merge_cfg_from_list(args.opts)
-
-
+evaluate_final_cfg()
 
 # Start session
 os.environ["CUDA_VISIBLE_DEVICES"] = str(cfg.GPU_ID)
