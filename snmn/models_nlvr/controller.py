@@ -55,6 +55,8 @@ class Controller:
             cv_list = []
             module_logit_list = []
             module_prob_list = []
+            left_right_logit_list = []
+            left_right_probs_list = []
             for t in range(T_ctrl):
                 q_i = fc('fc_q_%d' % t, q_encoding, output_dim=dim)  # [N, d]
                 q_i_c = tf.concat([q_i, c_prev], axis=1)  # [N, 2d]
@@ -68,12 +70,25 @@ class Controller:
                     'fc_module_w_layer2', module_w_l1, output_dim=num_module,
                     reuse=(t > 0))  # [N, M]
                 module_logit_list.append(module_w_l2)
+
+                # TODO is this the right architecture? consider that we get (0..1, 0..1) rather than a distribution -
+                # TODO the left/right probs don't depend on each other as in the module probs
+                left_right_w_l1 = fc_elu(
+                    'fc_left_right_w_layer1', cq_i, output_dim=dim, reuse=(t > 0))
+                left_right_w_l2 = fc(
+                    'fc_left_right_w_layer2', left_right_w_l1, output_dim=2,
+                    reuse=(t > 0))  # [N, M]
+                left_right_logit_list.append(left_right_w_l2)
+
                 if cfg.MODEL.CTRL.USE_GUMBEL_SOFTMAX:
                     module_prob = gumbel_softmax(
                         module_w_l2, cfg.MODEL.CTRL.GUMBEL_SOFTMAX_TMP)
                 else:
                     module_prob = tf.nn.softmax(module_w_l2, axis=1)
                 module_prob_list.append(module_prob)
+
+                left_right_probs = tf.nn.sigmoid(left_right_w_l2, axis=1)
+                left_right_probs_list.append(left_right_probs)
 
                 elem_prod = tf.reshape(cq_i * lstm_seq, to_T([S*N, dim]))
                 elem_prod.set_shape([None, dim])  # [S*N, d]
@@ -97,5 +112,7 @@ class Controller:
         self.module_logits = tf.stack(module_logit_list)
         self.module_probs = tf.stack(module_prob_list)
         self.module_prob_list = module_prob_list
+        self.left_right_probs = to_T(left_right_probs_list)
+        # TODO consider adding left_right[logits|probs] as attributes, as in module_probs
         self.c_list = c_list
         self.cv_list = cv_list

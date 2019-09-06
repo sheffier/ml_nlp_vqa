@@ -24,7 +24,7 @@ class Model:
             # Input unit
             lstm_seq, q_encoding, embed_seq = input_unit.build_input_unit(
                 input_seq_batch, seq_length_batch, num_vocab)
-            kb_batch = input_unit.build_kb_batch(image_feat_batch)
+            kb_batch_left, kb_batch_right = input_unit.build_kb_batch(image_feat_batch)
 
             # Controller and NMN
             num_module = len(module_names)
@@ -34,15 +34,27 @@ class Model:
             self.module_logits = self.controller.module_logits
             self.module_probs = self.controller.module_probs
             self.module_prob_list = self.controller.module_prob_list
-            self.nmn = nmn.NMN(
-                kb_batch, self.c_list, module_names, self.module_prob_list)
+            self.left_right_probs = self.controller.left_right_probs
+
+            left_module_probs, right_module_probs = (tf.identity(self.module_prob_list) for _ in range(2))
+            no_op_index = module_names.index('_NoOp')
+            for lri, module_probs in enumerate((left_module_probs, right_module_probs)):
+                module_probs *= self.left_right_probs[:, lri]
+                module_probs[:, no_op_index] += 1 - tf.reduce_sum(module_probs, axis=1)
+
+            self.left_module_prob_list = left_module_probs
+            self.right_module_prob_list = right_module_probs
+
+            self.nmn_left = nmn.NMN(kb_batch_left, self.c_list, module_names, left_module_probs)
+            self.nmn_right = nmn.NMN(kb_batch_right, self.c_list, module_names, right_module_probs)
 
             # Output unit
             if cfg.MODEL.BUILD_VQA:
                 self.vqa_scores = output_unit.build_output_unit_vqa(
-                    q_encoding, self.nmn.mem_last, num_choices,
+                    q_encoding, (self.nmn_left.mem_last, self.nmn_right.mem_last), num_choices,
                     dropout_keep_prob=dropout_keep_prob)
             if cfg.MODEL.BUILD_LOC:
+                raise NotImplementedError
                 loc_scores, bbox_offset, bbox_offset_fcn = \
                     output_unit.build_output_unit_loc(
                         q_encoding, kb_batch, self.nmn.att_last)

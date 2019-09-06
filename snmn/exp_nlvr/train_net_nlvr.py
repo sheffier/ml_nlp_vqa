@@ -47,7 +47,7 @@ module_names = data_reader.batch_loader.layout_dict.word_list
 input_seq_batch = tf.placeholder(tf.int32, [None, None])
 seq_length_batch = tf.placeholder(tf.int32, [None])
 image_feat_batch = tf.placeholder(
-    tf.float32, [None, cfg.MODEL.H_FEAT, cfg.MODEL.W_FEAT, cfg.MODEL.FEAT_DIM])
+    tf.float32, [None, cfg.MODEL.H_FEAT, 2 * cfg.MODEL.W_FEAT, cfg.MODEL.FEAT_DIM])
 dropout_keep_prob = tf.placeholder(tf.float32, shape=())
 model = Model(
     input_seq_batch, seq_length_batch, image_feat_batch, num_vocab=num_vocab,

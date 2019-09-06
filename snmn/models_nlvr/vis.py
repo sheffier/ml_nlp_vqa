@@ -122,7 +122,7 @@ def vis_one_loc(img_path, words, loc_scores, bbox_pred, bbox_gt, module_names,
 
     # scores
     plt.subplot(5, 3, 4)
-    plt.imshow(loc_scores.reshape(cfg.MODEL.H_FEAT, cfg.MODEL.W_FEAT))
+    plt.imshow(loc_scores.reshape(cfg.MODEL.H_FEAT, 2 * cfg.MODEL.W_FEAT))
     plt.colorbar()
     plt.title('localization scores')
 
@@ -331,11 +331,17 @@ def vis_one_stepwise(img_path, words, module_names, txt_att, att_stack,
 
     plt.savefig(save_path, bbox_inches='tight')
     with open(save_path.replace('.png', '') + '.txt', 'w') as f:
-        question = (' '.join(words)).replace(' ?', '?')
+        question = ' '.join(words)
         if vis_type == 'vqa':
             ans_pred, ans_gt = answers[np.argmax(vqa_scores)], answers[label]
-            json.dump({'question': question, 'ans_pred': ans_pred,
-                       'ans_gt': ans_gt}, f)
+            json.dump({'question': question,
+                       'ans_pred': ans_pred,
+                       'ans_gt': ans_gt,
+                       'txt_att': txt_att,
+                       'att_stack': att_stack,
+                       'stack_ptr': stack_ptr,
+                       'module_prob': module_prob},
+                      f, indent=4, encoder=NumpyEncoder)
         elif vis_type == 'loc':
             json.dump({'question': question, 'bbox_pred': list(bbox_pred),
                        'bbox_gt': list(bbox_gt)}, f)
@@ -343,6 +349,13 @@ def vis_one_stepwise(img_path, words, module_names, txt_att, att_stack,
             raise ValueError('Unknow vis_type ' + str(vis_type))
     print('visualization saved to ' + save_path)
     plt.close(h)
+
+
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
 
 
 def vis_batch_vqa(model, data_reader, batch, vis_outputs, start_idx,

@@ -119,14 +119,16 @@ class NMN:
             self.mem_last = self.mem_list[-1]
 
     def get_kb_attention(self, c_mapped):
+        return self.kb_batch
+        # TODO
         N = tf.shape(c_mapped)[0]
         best_c = tf.get_variable("best_c", shape=(1, cfg.MODEL.KB_DIM, 2), dtype=tf.float32,
                                  initializer=tf.constant_initializer(1.0))
         left_right_att = tf.nn.softmax(tf.tensordot(c_mapped, best_c, axes=([1], [1])), axis=2)
         left_att_broad = tf.broadcast_to(left_right_att[:, :, 0, ax, ax],
-                                         [N, cfg.MODEL.H_FEAT, cfg.MODEL.W_FEAT // 2, cfg.MODEL.KB_DIM])
+                                         [N, cfg.MODEL.H_FEAT, cfg.MODEL.W_FEAT, cfg.MODEL.KB_DIM])
         right_att_broad = tf.broadcast_to(left_right_att[:, :, 1, ax, ax],
-                                          [N, cfg.MODEL.H_FEAT, cfg.MODEL.W_FEAT // 2, cfg.MODEL.KB_DIM])
+                                          [N, cfg.MODEL.H_FEAT, cfg.MODEL.W_FEAT, cfg.MODEL.KB_DIM])
         left_right_att_broad = tf.concat([left_att_broad, right_att_broad], axis=2)
         kb_batch_left_right_att = tf.math.multiply(self.kb_batch, left_right_att_broad)
         return kb_batch_left_right_att
