@@ -56,7 +56,7 @@ ensure_done () {
     then
         echo -e "\e[1;4m$task_mark\e[0m: \e[33mSkipping\e[0m (already done - \e[97m$DONE_MARKS/$task_mark\e[0m exists)"
     else
-        echo -e "\e[1;4m$task_mark\e[0m: \e[34mRunning\e[0m"
+        echo -e "\e[1;4m$task_mark\e[0m: \e[36mRunning\e[0m"
         "$@"
         echo -e "\e[1;4m$task_mark\e[0m: \e[32mFinished\e[0m"
         date >> "$DONE_MARKS/$task_mark"
@@ -72,7 +72,7 @@ create_env () {
     conda create --yes -n $CONDA_PROJ_ENV
     conda activate $CONDA_PROJ_ENV
     conda update --yes --all
-    conda install --yes -c anaconda tensorflow tensorflow-gpu scikit-image pyyaml jupyter
+    conda install --yes -c anaconda tensorflow tensorflow-gpu scikit-image pyyaml humanfriendly jupyter
     conda install --yes -c conda-forge tqdm
     conda update --yes --all
 }
@@ -111,7 +111,7 @@ ensure_done download_test1_images
 cd $MY_FULL_DIR
 git clone --single-branch --branch "$GIT_BRANCH_NAME" https://github.com/sheffier/ml_nlp_vqa.git || ( cd ml_nlp_vqa ; git checkout -t origin/$GIT_BRANCH_NAME ; git pull )
 
-cd ml_nlp_vqa/snmn/exp_nlvr || exit ${LINENO}
+cd $MY_FULL_DIR/ml_nlp_vqa/snmn/exp_nlvr || exit ${LINENO}
 ln -s ../../../DATASETS/NLVR_images nlvr_images
 ln -s ../../../DATASETS/nlvr/nlvr2/data nlvr_dataset
 
@@ -124,4 +124,4 @@ extract_and_build_resnet () {
 }
 ensure_done extract_and_build_resnet
 
-echo -e "\e[1;34mWEEKLY SETUP FINISHED.\e[0m"
+echo -e "\e[1;36mWEEKLY SETUP FINISHED.\e[0m"

@@ -77,7 +77,7 @@ class BatchLoaderVqa:
             if self.load_gt_layout:
                 gt_layout_tokens = iminfo['gt_layout_tokens']
                 if self.prune_filter_module:
-                    # remove duplicated consequtive modules
+                    # remove duplicated consecutive modules
                     # (only keeping one _Filter)
                     for n_t in range(len(gt_layout_tokens)-1, 0, -1):
                         if (gt_layout_tokens[n_t-1] in {'_Filter', '_Find'}
@@ -136,7 +136,7 @@ class DataReader:
                 print('data reader: waiting for data loading (IO is slow)...')
             batch = self.prefetch_queue.get(block=True)
             if batch is None:
-                assert(self.one_pass)
+                assert self.one_pass
                 print('data reader: one pass finished')
                 # raise StopIteration()
                 break
