@@ -127,7 +127,8 @@ for n_batch, batch in enumerate(data_reader.batches()):
               (cfg.EXP_NAME, cfg.TEST.MODEL_ITER_OR_NAME, cfg.TEST.SPLIT_VQA,
                accuracy, answer_correct, num_questions))
 
-with open(eval_file, 'w') as f:
+if cfg.TEST.GEN_EVAL_FILE:
+    with open(eval_file, 'w') as f:
         json.dump(output_qids_answers, f, indent=2)
         print('prediction file written to', eval_file)
 

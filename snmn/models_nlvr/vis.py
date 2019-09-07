@@ -224,19 +224,19 @@ def vis_one_stepwise(img_path, words, module_names, txt_att, att_stack,
     W = cfg.MODEL.W_FEAT
 
     # M = len(module_names)
-    img_path1 = img_path.replace('img0','img1')
+    img_path1 = img_path.replace('img0', 'img1')
     img0 = skimage.io.imread(img_path)
     img1 = skimage.io.imread(img_path1)
     img0 = skimage.transform.resize(img0, (320, 480))
     img1 = skimage.transform.resize(img1, (320, 480))
-    img = np.hstack([img0,img1])
+    img = np.hstack([img0, img1])
     scale_x = 2 * 480. / img.shape[1]
     scale_y = 320. / img.shape[0]
 
-    h = plt.figure(figsize=(18, (T+2) * 5))
+    h = plt.figure(figsize=(18, (T + 2) * 5))
     if cfg.TEST.VIS_SHOW_IMG:
         # Image and question
-        plt.subplot((T+2)*2, 3, (3, 6))
+        plt.subplot((T + 2) * 2, 3, (3, 6))
         plt.imshow(img)
         plt.axis('off')
         plt.title('\n'.join(
@@ -244,22 +244,26 @@ def vis_one_stepwise(img_path, words, module_names, txt_att, att_stack,
             fontsize=20)
 
     # Modules at each timestep
-    m_list = [module_names[np.argmax(module_prob[t])] for t in range(T)]
-    is_disp = np.ones(T, np.bool)
-    is_ans = np.zeros(T, np.bool)
+    m_list = [module_names[np.argmax(module_prob[t])] for t in range(T)]  # highest prob module for each time-step
+    is_disp = np.ones(T, np.bool)  # [t] = whether to display the time-step t
+    is_ans = np.zeros(T, np.bool)  # [t] = whether time-step t is the final answer
     if vis_type == 'vqa':
         """
         Show the output of the last "_Describe*"
         """
-        describe_t = -1
+        describe_t = -1  # index of last describe
         for t in range(T-1, -1, -1):
             if m_list[t].startswith('_Describe'):
                 describe_t = t
                 break
-        for t in range(T):
+
+        # TODO continue getting rid of this:
+        """
+        for t in range(T):  # display the time-steps that aren't NoOp or a non-final Describe
             is_disp[t] = not (
                 (m_list[t] == '_NoOp') or
                 (m_list[t].startswith('_Describe') and t != describe_t))
+        """
         is_ans[describe_t] = True
     else:
         for t in range(T):
@@ -320,7 +324,9 @@ def vis_one_stepwise(img_path, words, module_names, txt_att, att_stack,
                 raise ValueError('Unknow vis_type ' + str(vis_type))
         else:
             plt.subplot((T+2)*2, 3, (6*t_disp+9, 6*t_disp+12))
-            att = np.sum(att_stack[t, :, W] * stack_ptr[t, :, 0] + att_stack[t, :, W:] * stack_ptr[t, :, 1], axis=-1)
+            att = np.sum(np.concatenate((att_stack[t, :, :W] * stack_ptr[t, :, 0],
+                                         att_stack[t, :, W:] * stack_ptr[t, :, 1]), axis=1),
+                         axis=-1)
             img_with_att = attention_interpolation(img, att)
             plt.imshow(img_with_att)
             plt.xticks([], [])
@@ -397,7 +403,7 @@ def vis_batch_vqa(model, data_reader, batch, vis_outputs, start_idx,
         words = [
             data_reader.batch_loader.vocab_dict.idx2word(n_w) for n_w in
             batch['input_seq_batch'][:batch['seq_length_batch'][n], n]]
-        vqa_scores = None  # vis_outputs['vqa_scores'][n]
+        vqa_scores = vis_outputs['vqa_scores'][n]
         label = batch['answer_label_batch'][n]
         txt_att = vis_outputs['txt_att'][n]
         att_stack = vis_outputs['att_stack'][n]
