@@ -5,6 +5,7 @@ import random
 import re
 import sys
 import collections
+import argparse
 import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
@@ -287,11 +288,22 @@ def convert_instances_to_tfrecords(split_name, instances, num_instances_per_shar
 
 if __name__ == '__main__':
     tf.logging.set_verbosity(tf.logging.ERROR)
-    random_seed = 0
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--type', type=str, default='training',
+                        help='Type of dataset to generate. Type = "training"/"pretraining"')
+    parser.add_argument('--seed', default=0)
+
+    args = parser.parse_args()
+
+    assert args.type in ("training", "pretraining"),\
+        "Wrong dataset type. Expected ('training', 'pretraining'), got %s" % args.type
+
+    is_pretrain = (args.type == 'pretraining')
+    random_seed = args.seed
 
     qst_vocab_dict = text_processing.VocabDict(question_vocab_file)
     ans_vocab_dict = text_processing.VocabDict(answer_vocab_file)
-    is_pretrain = True
     masked_lm_prob = 0.15
     max_predictions_per_seq = 8
 

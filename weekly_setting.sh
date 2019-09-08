@@ -26,6 +26,7 @@ done
 
 GPU_ID=${GPU_ID:-best}
 CONDA_PROJ_ENV=NLP
+DATASET_TYPE=training
 
 while [[ "$1" != "" ]]; do
     case $1 in
@@ -34,6 +35,9 @@ while [[ "$1" != "" ]]; do
                                 ;;
         -e | --conda_env )      shift
                                 CONDA_PROJ_ENV=$1
+                                ;;
+        -d | --ds_type )        shift
+                                DATASET_TYPE=$1
                                 ;;
         -h | --help )           usage
                                 exit
@@ -121,7 +125,7 @@ extract_and_build_resnet () {
     bash ./exp_nlvr/tfmodel/resnet/download_resnet_v1_152.sh || exit ${LINENO}
     cd exp_nlvr/data
     python extract_resnet152_c5_7x7.py --gpu_id "$GPU_ID" || exit ${LINENO}
-    python build_nlvr_imdb_r152_7x7.py || exit ${LINENO}
+    python build_nlvr_dataset.py --type "$DATASET_TYPE" || exit ${LINENO}
 }
 ensure_done extract_and_build_resnet
 
