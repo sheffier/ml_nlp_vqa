@@ -1,4 +1,4 @@
-EXP_NAME: nlvr
+EXP_NAME: separate-left-right-large-batch
 MODEL:
   H_FEAT: 7
   W_FEAT: 7
@@ -31,6 +31,9 @@ TRAIN:
 TEST:
   EVAL_FILE: './exp_nlvr/eval_outputs_nlvr/%s/nlvr_%s_%s_%s_results.json'
   SPLIT_VQA: 'test'
+  VIS_SEPARATE_CORRECTNESS: True
+  NUM_VIS_CORRECT: 10
+  NUM_VIS_INCORRECT: 10
 
 USE_FIXED_WORD_EMBED: True
 FIXED_WORD_EMBED_FILE: './exp_nlvr/data/vocabulary_nlvr_glove.npy'

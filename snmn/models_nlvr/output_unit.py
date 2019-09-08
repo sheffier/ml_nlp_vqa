@@ -13,7 +13,7 @@ def build_output_unit_vqa(q_encoding, m_last, num_choices, dropout_keep_prob,
 
     Input:
         q_encoding: [N, d], tf.float32
-        m_last: [N, d], tf.float32
+        m_last: [2, N, d], tf.float32
     Return:
         vqa_scores: [N, num_choices], tf.float32
     """
@@ -22,9 +22,10 @@ def build_output_unit_vqa(q_encoding, m_last, num_choices, dropout_keep_prob,
     with tf.variable_scope(scope, reuse=reuse):
         if cfg.MODEL.VQA_OUTPUT_USE_QUESTION:
             fc1 = fc_elu(
-                'fc1', tf.concat([q_encoding, m_last], axis=1),
+                'fc1', tf.concat([q_encoding, m_last[0], m_last[1]], axis=1),
                 output_dim=output_dim)
         else:
+            raise NotImplementedError('having a double m_last was not adapted')
             fc1 = fc_elu('fc1_wo_q', m_last, output_dim=output_dim)
 
         fc1 = tf.nn.dropout(fc1, dropout_keep_prob)

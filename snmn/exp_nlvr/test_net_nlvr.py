@@ -7,8 +7,12 @@ import tensorflow as tf
 
 from models_nlvr.model import Model
 from models_nlvr.config import (
-    cfg, merge_cfg_from_file, merge_cfg_from_list)
+    cfg, merge_cfg_from_file, merge_cfg_from_list, evaluate_final_cfg)
 from util.nlvr_train.data_reader import DataReader
+
+
+tf.logging.set_verbosity(tf.logging.ERROR)
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--cfg', required=True)
@@ -18,8 +22,7 @@ merge_cfg_from_file(args.cfg)
 assert cfg.EXP_NAME == os.path.basename(args.cfg).replace('.yaml', '')
 if args.opts:
     merge_cfg_from_list(args.opts)
-
-
+evaluate_final_cfg()
 
 # Start session
 os.environ["CUDA_VISIBLE_DEVICES"] = str(cfg.GPU_ID)
@@ -52,7 +55,7 @@ if cfg.TEST.GEN_EVAL_FILE:
 input_seq_batch = tf.placeholder(tf.int32, [None, None])
 seq_length_batch = tf.placeholder(tf.int32, [None])
 image_feat_batch = tf.placeholder(
-    tf.float32, [None, cfg.MODEL.H_FEAT, cfg.MODEL.W_FEAT, cfg.MODEL.FEAT_DIM])
+    tf.float32, [None, cfg.MODEL.H_FEAT, 2 * cfg.MODEL.W_FEAT, cfg.MODEL.FEAT_DIM])
 dropout_keep_prob = tf.placeholder(tf.float32, shape=())
 model = Model(
     input_seq_batch, seq_length_batch, image_feat_batch, num_vocab=num_vocab,
@@ -126,7 +129,8 @@ for n_batch, batch in enumerate(data_reader.batches()):
               (cfg.EXP_NAME, cfg.TEST.MODEL_ITER_OR_NAME, cfg.TEST.SPLIT_VQA,
                accuracy, answer_correct, num_questions))
 
-with open(eval_file, 'w') as f:
+if cfg.TEST.GEN_EVAL_FILE:
+    with open(eval_file, 'w') as f:
         json.dump(output_qids_answers, f, indent=2)
         print('prediction file written to', eval_file)
 

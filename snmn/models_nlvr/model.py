@@ -66,20 +66,28 @@ class PreTrainOutputs:
             N = batch_size
 
             # (N*H*W , C)
-            kb_batch_att = tf.reshape(model.kb_batch * model.nmn.att_last,
-                                      (N * cfg.MODEL.H_FEAT * cfg.MODEL.W_FEAT, cfg.MODEL.KB_DIM))
+            # left_kb_batch_att = tf.reshape(model.left_kb_batch * model.nmn_left.att_last,
+            #                                (N * cfg.MODEL.H_FEAT * cfg.MODEL.W_FEAT, cfg.MODEL.KB_DIM))
+            # right_kb_batch_att = tf.reshape(model.right_kb_batch * model.nmn_right.att_last,
+            #                                 (N * cfg.MODEL.H_FEAT * cfg.MODEL.W_FEAT, cfg.MODEL.KB_DIM))
 
-            # (N*H*W , C) -> (N*H*W , d)
+            left_kb_batch_att = model.left_kb_batch * model.nmn_left.att_last
+            right_kb_batch_att = model.right_kb_batch * model.nmn_right.att_last
+
+            kb_batch_att = tf.concat((left_kb_batch_att, right_kb_batch_att), axis=2)
+            kb_batch_att = tf.reshape(kb_batch_att, (N * cfg.MODEL.H_FEAT * cfg.MODEL.W_FEAT * 2, cfg.MODEL.KB_DIM))
+
+            # (N*H*W*2 , C) -> (N*H*W*2 , d)
             Wk = fc("temp_name__", kb_batch_att, output_dim=cfg.MODEL.LSTM_DIM)
-            Wk = tf.reshape(Wk, (-1, cfg.MODEL.H_FEAT * cfg.MODEL.W_FEAT, cfg.MODEL.LSTM_DIM))
+            Wk = tf.reshape(Wk, (-1, cfg.MODEL.H_FEAT * cfg.MODEL.W_FEAT * 2, cfg.MODEL.LSTM_DIM))
 
             #  j  i   l      i  j  k     j   l   k
-            # (N, S, H*W) = (S, N, d) * (N, H*W, d)
+            # (N, S, H*W*2) = (S, N, d) * (N, H*W*2, d)
             scores = tf.einsum('ijk, jlk->jil', model.lstm_seq, Wk)
             scores = tf.nn.softmax(scores, axis=-1)
 
             #  i  j  l     i  j   k      i  k    l
-            # (N, S, d) = (N, S, H*W) * (N, H*W, d)
+            # (N, S, d) = (N, S, H*W*2) * (N, H*W*2, d)
             kb_lstm = tf.einsum('ijk, ikl->ijl', scores, Wk)
             kb_lstm = kb_lstm + tf.transpose(model.lstm_seq, perm=[1, 0, 2])  # (N, S, d)
             # kb_lstm = tf.reshape(kb_lstm, (N * S, cfg.MODEL.LSTM_DIM))
@@ -100,12 +108,12 @@ class TrainingOutputs:
         with tf.variable_scope(scope, reuse=reuse):
             if cfg.MODEL.BUILD_VQA:
                 self.vqa_scores = output_unit.build_output_unit_vqa(
-                    model.q_encoding, model.nmn.mem_last, num_choices,
+                    model.q_encoding, model.nmns.mem_last, num_choices,
                     dropout_keep_prob=dropout_keep_prob)
             if cfg.MODEL.BUILD_LOC:
                 loc_scores, bbox_offset, bbox_offset_fcn = \
                     output_unit.build_output_unit_loc(
-                        model.q_encoding, model.kb_batch, model.nmn.att_last)
+                        model.q_encoding, model.kb_batch, model.nmns.att_last)
                 self.loc_scores = loc_scores
                 self.bbox_offset = bbox_offset
                 self.bbox_offset_fcn = bbox_offset_fcn
@@ -143,7 +151,7 @@ class BaseModel:
             # Input unit
             self.lstm_seq, self.q_encoding, self.embed_seq = input_unit.build_input_unit(
                 input_seq_batch, seq_length_batch, num_vocab)
-            self.kb_batch = input_unit.build_kb_batch(image_feat_batch)
+            self.kb_batch_left, self.kb_batch_right = input_unit.build_kb_batch(image_feat_batch)
 
             # Controller and NMN
             num_module = len(module_names)
@@ -153,8 +161,21 @@ class BaseModel:
             self.module_logits = self.controller.module_logits
             self.module_probs = self.controller.module_probs
             self.module_prob_list = self.controller.module_prob_list
-            self.nmn = nmn.NMN(
-                self.kb_batch, self.c_list, module_names, self.module_prob_list)
+            self.left_right_probs = self.controller.left_right_probs
+
+            left_module_probs, right_module_probs = (tf.identity(self.module_prob_list) for _ in range(2))
+            no_op_index = module_names.index('_NoOp')
+            for lri, module_probs in enumerate((left_module_probs, right_module_probs)):
+                module_probs *= self.left_right_probs[:, :, lri]
+                module_probs += (1 - tf.reduce_sum(module_probs, axis=-1, keep_dims=True)
+                                 ) * tf.one_hot([[no_op_index]], depth=module_probs.get_shape()[-1])
+
+            self.left_module_prob_list = left_module_probs
+            self.right_module_prob_list = right_module_probs
+
+            self.nmn_left = nmn.NMN(self.kb_batch_left, self.c_list, module_names, left_module_probs)
+            self.nmn_right = nmn.NMN(self.kb_batch_right, self.c_list, module_names, right_module_probs, reuse=True)
+            self.nmns = Aggregate((self.nmn_left, self.nmn_right))
 
     def get_variable_list(self):
         vars = tf.trainable_variables(scope=self.scope)
@@ -228,10 +249,10 @@ class TrainingModel:
                 'txt_att':  # [N, T, S]
                 tf.transpose(  # [S, N, T] -> [N, T, S]
                     tf.concat(self.base_model.controller.cv_list, axis=2), (1, 2, 0)),
-                'att_stack':  # [N, T, H, W, L]
-                tf.stack(self.base_model.nmn.att_stack_list, axis=1),
-                'stack_ptr':  # [N, T, L]
-                tf.stack(self.base_model.nmn.stack_ptr_list, axis=1),
+                'att_stack':  # [N, T, H, 2W, L]
+                tf.concat(tuple(tf.stack(l, axis=1) for l in self.base_model.nmns.att_stack_list), axis=3),
+                'stack_ptr':  # [N, T, L, 2]
+                tf.stack(tuple(tf.stack(l, axis=1) for l in self.base_model.nmns.stack_ptr_list), axis=-1),
                 'module_prob':  # [N, T, D]
                 tf.stack(self.base_model.module_prob_list, axis=1)}
             if cfg.MODEL.BUILD_VQA:
@@ -260,3 +281,8 @@ class TrainingModel:
 
     def vis_batch_loc(self, *args):
         vis.vis_batch_loc(self, *args)
+
+
+class Aggregate(tuple):
+    def __getattr__(self, item):
+        return Aggregate((getattr(self[0], item), getattr(self[1], item)))

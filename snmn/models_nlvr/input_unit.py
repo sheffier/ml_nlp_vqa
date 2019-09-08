@@ -75,11 +75,20 @@ def build_kb_batch(image_feat_batch, scope='kb_batch', reuse=None):
     CNN on top of it.
 
     Input:
-        image_feat_batch: [N, H, W, C], tf.float32
+        image_feat_batch: [N, H, 2W, C], tf.float32
     Return:
-        kb_batch: [N, H, W, d], tf.float32
+        kb_batch: ([N, H, W, d], [N, H, W, d]), tf.float32
     """
 
+    W = tf.shape(image_feat_batch)[2]
+    left_image_feat_batch = image_feat_batch[:, :, :W, :]
+    right_image_feat_batch = image_feat_batch[:, :, W:, :]
+
+    return (build_kb_batch_one_image(left_image_feat_batch, scope, reuse),
+            build_kb_batch_one_image(right_image_feat_batch, scope, reuse=True))
+
+
+def build_kb_batch_one_image(image_feat_batch, scope='kb_batch', reuse=None):
     kb_dim = cfg.MODEL.KB_DIM
     with tf.variable_scope(scope, reuse=reuse):
         if cfg.MODEL.INPUT.USE_L2_NORMALIZATION:

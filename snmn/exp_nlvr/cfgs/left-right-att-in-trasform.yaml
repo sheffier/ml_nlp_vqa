@@ -1,4 +1,4 @@
-EXP_NAME: nlvr
+EXP_NAME: left-right-att-in-trasform
 MODEL:
   H_FEAT: 7
   W_FEAT: 7

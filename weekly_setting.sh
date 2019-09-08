@@ -60,10 +60,19 @@ ensure_done () {
     then
         echo -e "\e[1;4m$task_mark\e[0m: \e[33mSkipping\e[0m (already done - \e[97m$DONE_MARKS/$task_mark\e[0m exists)"
     else
+        date >> "$DONE_MARKS/$task_mark"
         echo -e "\e[1;4m$task_mark\e[0m: \e[36mRunning\e[0m"
         "$@"
-        echo -e "\e[1;4m$task_mark\e[0m: \e[32mFinished\e[0m"
-        date >> "$DONE_MARKS/$task_mark"
+        return_code=$?
+        if [[ $return_code -eq 0 ]]; then
+            echo -e "\e[1;4m$task_mark\e[0m: \e[32mFinished\e[0m"
+            date >> "$DONE_MARKS/$task_mark"
+        else
+            rm "$DONE_MARKS/$task_mark"
+            echo -e "\e[1;4m$task_mark\e[0m: \e[91mFailed\e[0m"
+            exit $return_code
+            return $return_code
+        fi
     fi
 }
 
@@ -78,7 +87,7 @@ create_env () {
     conda update --yes --all
     conda install --yes -c anaconda tensorflow tensorflow-gpu scikit-image pyyaml humanfriendly jupyter
     conda install --yes -c conda-forge tqdm
-    pip install comet_ml
+    pip install comet-ml
     conda update --yes --all
 }
 ensure_done create_env $CONDA_PROJ_ENV
@@ -89,10 +98,10 @@ mkdir -p DATASETS && cd DATASETS
 git clone https://github.com/lil-lab/nlvr.git || ( cd nlvr && git pull )
 
 cd $MY_FULL_DIR/DATASETS
-mkdir -p NLVR_images && cd NLVR_images
+mkdir -p NLVR_images/images && cd NLVR_images
 
 download_train_images () {
-    wget -c "http://lil.nlp.cornell.edu/resources/NLVR2/train_img.zip" && unzip train_img.zip || exit ${LINENO}
+    wget -c "http://lil.nlp.cornell.edu/resources/NLVR2/train_img.zip" && unzip train_img.zip || return ${LINENO}
     for i in {0..99}; do
         mv images/train/$i/* images/train
         rmdir images/train/$i
@@ -100,12 +109,12 @@ download_train_images () {
     rm train_img.zip
 }
 download_dev_images () {
-    wget -c "http://lil.nlp.cornell.edu/resources/NLVR2/dev_img.zip" && unzip dev_img.zip || exit ${LINENO}
+    wget -c "http://lil.nlp.cornell.edu/resources/NLVR2/dev_img.zip" && unzip dev_img.zip || return ${LINENO}
     mv dev images/dev
     rm dev_img.zip
 }
 download_test1_images () {
-    wget -c "http://lil.nlp.cornell.edu/resources/NLVR2/test1_img.zip" && unzip test1_img.zip || exit ${LINENO}
+    wget -c "http://lil.nlp.cornell.edu/resources/NLVR2/test1_img.zip" && unzip test1_img.zip || return ${LINENO}
     mv test1 images/test1
     rm test1_img.zip
 }
@@ -122,10 +131,11 @@ ln -s ../../../DATASETS/nlvr/nlvr2/data nlvr_dataset
 
 extract_and_build_resnet () {
     cd $MY_FULL_DIR/ml_nlp_vqa/snmn
-    bash ./exp_nlvr/tfmodel/resnet/download_resnet_v1_152.sh || exit ${LINENO}
+    bash ./exp_nlvr/tfmodel/resnet/download_resnet_v1_152.sh || return ${LINENO}
     cd exp_nlvr/data
-    python extract_resnet152_c5_7x7.py --gpu_id "$GPU_ID" || exit ${LINENO}
-    python build_nlvr_dataset.py --type "$DATASET_TYPE" || exit ${LINENO}
+    conda activate $CONDA_PROJ_ENV || return ${LINENO}
+    python extract_resnet152_c5_7x7.py --gpu_id "$GPU_ID" || return ${LINENO}
+    python build_nlvr_dataset.py --type "$DATASET_TYPE" || return ${LINENO}
 }
 ensure_done extract_and_build_resnet
 
