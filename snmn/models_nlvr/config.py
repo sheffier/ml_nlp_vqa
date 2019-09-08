@@ -1,8 +1,12 @@
 from ast import literal_eval
 import copy
 import yaml
+import subprocess
+import re
+import humanfriendly  # conda install -y -c anaconda humanfriendly
 import numpy as np
 from util.attr_dict import AttrDict
+
 
 __C = AttrDict()
 cfg = __C
@@ -11,7 +15,7 @@ cfg = __C
 # general options
 # --------------------------------------------------------------------------- #
 __C.EXP_NAME = '__default__'
-__C.GPU_ID = 0
+__C.GPU_ID = "best"  # "best" is changed to best according to nvidia-smi
 __C.GPU_MEM_GROWTH = True
 
 __C.VOCAB_QUESTION_FILE = './exp_nlvr/data/vocabulary_nlvr.txt'
@@ -123,7 +127,7 @@ __C.VAL.BATCH_SIZE = 100
 __C.TEST = AttrDict()
 __C.TEST.BATCH_SIZE = 64
 __C.TEST.USE_EMV = True
-__C.TEST.SPLIT_VQA = 'test'  # TODO
+__C.TEST.SPLIT_VQA = 'test'
 __C.TEST.SPLIT_LOC = 'REPLACE_THIS_WITH_GOOGLE_REF_TEST'
 __C.TEST.SNAPSHOT_FILE = './exp_nlvr/tfmodel/%s/%s'
 __C.TEST.MODEL_ITER_OR_NAME = ""  # Needs to be supplied
@@ -266,3 +270,35 @@ def _check_and_coerce_cfg_value_type(value_a, value_b, key, full_key):
             'key: {}'.format(type_b, type_a, value_b, value_a, full_key)
         )
     return value_a
+
+
+def evaluate_final_cfg():
+    NVIDIA_SMI_GPU_RE = re.compile(r"^\|\s*"
+                                   r"(?P<id>\d+)\s+TITAN"
+                                   r".*\r?\n.*"
+                                   r"(?P<mem_usage>\d+\w+)\s*/\s*(?P<total_mem>\d+\w+)"
+                                   r"\s*\|\s*"
+                                   r"(?P<usage>\d+)%\s+Default"
+                                   r"\s*\|\s*$",
+                                   re.MULTILINE | re.IGNORECASE)
+
+    if isinstance(__C.GPU_ID, (str, bytes)) and __C.GPU_ID.lower() == "best":
+        nvidia_smi = subprocess.check_output(["nvidia-smi"]).decode('ascii')
+        best_gpu_usage = np.inf
+        best_available_mem = 0
+        best_gpu_id = 0
+
+        def get_size(re_match, group_name):
+            return float(humanfriendly.parse_size(re_match.group(group_name)))
+
+        for gpu_match in NVIDIA_SMI_GPU_RE.finditer(nvidia_smi):
+            usage = float(gpu_match.group('usage'))
+            available_mem = get_size(gpu_match, 'total_mem') - get_size(gpu_match, 'mem_usage')
+            if usage < best_gpu_usage or (usage <= best_gpu_usage and available_mem >= best_available_mem):
+                best_gpu_id = int(gpu_match.group('id'))
+                best_gpu_usage = usage
+                best_available_mem = available_mem
+
+        print(f"\x1b[36mGPU CHOSEN AUTOMATICALLY\x1b[0m as {best_gpu_id} (usage "
+              f"{best_gpu_usage}%, available memory {humanfriendly.format_size(best_available_mem, binary=True)}).")
+        __C.GPU_ID = best_gpu_id
