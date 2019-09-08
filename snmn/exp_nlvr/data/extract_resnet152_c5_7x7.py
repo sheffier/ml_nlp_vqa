@@ -18,7 +18,7 @@ gpu_id = args.gpu_id  # set GPU id to use
 os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu_id)
 
 resnet152_model = '../tfmodel/resnet/resnet_v1_152.tfmodel'
-image_basedir = '../nlvr_dataset/images/'
+image_basedir = '../nlvr_images/images/'
 save_basedir = './resnet152_c5_7x7/'
 H = 448
 W = 448
