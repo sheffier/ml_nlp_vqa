@@ -44,7 +44,7 @@ def create_dataset(file_pattern, batch_size, max_seq_length, max_predictions_per
 
         # `cycle_length` is the number of parallel files that get read.
         threads = multiprocessing.cpu_count()
-        cycle_length = min(threads, len(file_pattern)) * 2
+        cycle_length = min(threads, len(file_pattern))
 
         dataset = dataset.interleave(tf.data.TFRecordDataset,
                                      cycle_length=cycle_length,
@@ -54,7 +54,7 @@ def create_dataset(file_pattern, batch_size, max_seq_length, max_predictions_per
         dataset = dataset.repeat(num_epochs)
 
         if is_training is True:
-            dataset = dataset.shuffle((32*batch_size))
+            dataset = dataset.shuffle((20*batch_size))
 
         dataset = dataset.map(_parse, num_parallel_calls=threads)
 
@@ -65,10 +65,13 @@ def create_dataset(file_pattern, batch_size, max_seq_length, max_predictions_per
     return dataset
 
 
-def prepare_dataset_iterators(train_file_pattern, batch_size=128):
+def prepare_dataset_iterators(train_file_pattern, val_file_pattern, batch_size=128):
     # Make a dataset from the train data
     train_ds = create_dataset(train_file_pattern, batch_size, FLAGS.max_seq_length, FLAGS.max_predictions_per_seq,
                               True)
+    # Make a dataset from the train data
+    val_ds = create_dataset(val_file_pattern, batch_size, FLAGS.max_seq_length, FLAGS.max_predictions_per_seq,
+                            False)
 
     # Define an abstract iterator
     # Make an iterator object that has the shape and type of our datasets
@@ -79,32 +82,6 @@ def prepare_dataset_iterators(train_file_pattern, batch_size=128):
     next_element = iterator.get_next()
     # These ops let us switch and reinitialize every time we finish an epoch
     training_init_op = iterator.make_initializer(train_ds)
+    validation_init_op = iterator.make_initializer(val_ds)
 
-    return next_element, training_init_op
-
-# def prepare_dataset_iterators(train_file_pattern, val_file_pattern, batch_size=64):
-#     train_input_files = []
-#     train_input_files.extend(tf.gfile.Glob(train_file_pattern))
-#
-#     val_input_files = []
-#     val_input_files.extend(tf.gfile.Glob(val_file_pattern))
-#
-#     # Make a dataset from the train data
-#     train_ds = create_dataset(train_input_files, batch_size, FLAGS.max_seq_length, FLAGS.max_predictions_per_seq,
-#                               True)
-#     # make a dataset from the validation data
-#     val_ds = create_dataset(val_input_files, batch_size, FLAGS.max_seq_length, FLAGS.max_predictions_per_seq,
-#                               True)
-#
-#     # Define an abstract iterator
-#     # Make an iterator object that has the shape and type of our datasets
-#     iterator = tf.data.Iterator.from_structure(train_ds.output_types,
-#                                                train_ds.output_shapes)
-#
-#     # This is an op that gets the next element from the iterator
-#     next_element = iterator.get_next()
-#     # These ops let us switch and reinitialize every time we finish an epoch
-#     training_init_op = iterator.make_initializer(train_ds)
-#     validation_init_op = iterator.make_initializer(val_ds)
-#
-#     return next_element, training_init_op, validation_init_op
+    return next_element, training_init_op, validation_init_op

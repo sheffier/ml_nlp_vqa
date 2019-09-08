@@ -55,7 +55,8 @@ def get_tfrecord_filename(output_path, split_name, shard_id, num_shards):
     return os.path.join(output_path, output_filename)
 
 
-def convert_to_tfrecord(instances, output_filename, max_seq_length, qst_vocab_dict, ans_vocab_dict):
+def convert_to_tfrecord(instances, output_filename, max_seq_length, max_predictions_per_seq,
+                        qst_vocab_dict, ans_vocab_dict):
     # Open a TFRecordWriter for the output-file.
     with tf.python_io.TFRecordWriter(output_filename) as writer:
         for instance in instances:
@@ -115,60 +116,64 @@ def create_masked_lm_predictions(tokens, masked_lm_prob, max_predictions_per_seq
                                  qst_vocab_words, rng):
     """Creates the predictions for the masked LM objective."""
 
-    cand_indexes = []
-    for (i, token) in enumerate(tokens):
-        cand_indexes.append(i)
-
-    rng.shuffle(cand_indexes)
-
     output_tokens = list(tokens)
 
-    num_to_predict = min(max_predictions_per_seq,
-                         max(1, int(round(len(tokens) * masked_lm_prob))))
+    if rng is not None:
+        cand_indexes = []
+        for (i, token) in enumerate(tokens):
+            cand_indexes.append(i)
 
-    masked_lms = []
-    covered_indexes = set()
-    for index in cand_indexes:
-        if len(masked_lms) >= num_to_predict:
-            break
-        if index in covered_indexes:
-            continue
-        covered_indexes.add(index)
+        rng.shuffle(cand_indexes)
 
-        masked_token = None
-        # 80% of the time, replace with [MASK]
-        if rng.random() < 0.8:
-            masked_token = "<mask>"
-        else:
-            # 10% of the time, keep original
-            if rng.random() < 0.5:
-                masked_token = tokens[index]
-            # 10% of the time, replace with random word
+        num_to_predict = min(max_predictions_per_seq,
+                             max(1, int(round(len(tokens) * masked_lm_prob))))
+
+        masked_lms = []
+        covered_indexes = set()
+        for index in cand_indexes:
+            if len(masked_lms) >= num_to_predict:
+                break
+            if index in covered_indexes:
+                continue
+            covered_indexes.add(index)
+
+            masked_token = None
+            # 80% of the time, replace with [MASK]
+            if rng.random() < 0.8:
+                masked_token = "<mask>"
             else:
-                masked_token = qst_vocab_words[rng.randint(0, len(qst_vocab_words) - 1)]
+                # 10% of the time, keep original
+                if rng.random() < 0.5:
+                    masked_token = tokens[index]
+                # 10% of the time, replace with random word
+                else:
+                    masked_token = qst_vocab_words[rng.randint(0, len(qst_vocab_words) - 1)]
 
-        output_tokens[index] = masked_token
+            output_tokens[index] = masked_token
 
-        masked_lms.append(MaskedLmInstance(index=index, label=tokens[index]))
+            masked_lms.append(MaskedLmInstance(index=index, label=tokens[index]))
 
-    assert len(masked_lms) <= num_to_predict
-    masked_lms = sorted(masked_lms, key=lambda x: x.index)
+        assert len(masked_lms) <= num_to_predict
+        masked_lms = sorted(masked_lms, key=lambda x: x.index)
 
-    masked_lm_positions = []
-    masked_lm_labels = []
-    for p in masked_lms:
-        masked_lm_positions.append(p.index)
-        masked_lm_labels.append(p.label)
+        masked_lm_positions = []
+        masked_lm_labels = []
+        for p in masked_lms:
+            masked_lm_positions.append(p.index)
+            masked_lm_labels.append(p.label)
+    else:
+        masked_lm_positions = np.empty(max_predictions_per_seq, dtype=np.int32)
+        masked_lm_labels = np.empty(max_predictions_per_seq, dtype=np.int32)
 
     return (output_tokens, masked_lm_positions, masked_lm_labels)
 
 
 def create_dataset_instances(base_imdb, split_name, dupe_factor, masked_lm_prob,
                              max_predictions_per_seq, qst_vocab_words, rng):
-    print("[%s] creating dataset" % split_name)
     instances = []
 
     with tqdm(total=dupe_factor * len(base_imdb)) as pbar:
+        pbar.set_description("[%s] creating instance dataset" % split_name)
         for _ in range(dupe_factor):
             for iminfo in base_imdb:
                 tokens = iminfo["question_tokens"]
@@ -257,14 +262,14 @@ def build_base_imdb(image_set):
 
 
 def convert_instances_to_tfrecords(split_name, instances, num_instances_per_shard, max_seq_length,
-                                   qst_vocab_dict, ans_vocab_dict):
-    print("Converting %s imdb to tfrecords: " % split_name)
-
+                                   max_predictions_per_seq, qst_vocab_dict, ans_vocab_dict):
     n_instances = len(instances)
     num_shards = int(math.ceil(n_instances / num_instances_per_shard))
 
     pool = Pool()
     pbar = tqdm(total=num_shards)
+
+    pbar.set_description("Converting %s imdb to tfrecords: " % split_name)
 
     def update(*a):
         pbar.update()
@@ -273,7 +278,8 @@ def convert_instances_to_tfrecords(split_name, instances, num_instances_per_shar
         output_filename = get_tfrecord_filename(datasets_dir, split_name, i, num_shards)
         inst_slice = instances[i * num_instances_per_shard:i * num_instances_per_shard + num_instances_per_shard]
         pool.apply_async(convert_to_tfrecord,
-                         args=(inst_slice, output_filename, max_seq_length, qst_vocab_dict, ans_vocab_dict),
+                         args=(inst_slice, output_filename, max_seq_length, max_predictions_per_seq,
+                               qst_vocab_dict, ans_vocab_dict),
                          callback=update)
     pool.close()
     pool.join()
@@ -282,12 +288,21 @@ def convert_instances_to_tfrecords(split_name, instances, num_instances_per_shar
 if __name__ == '__main__':
     tf.logging.set_verbosity(tf.logging.ERROR)
     random_seed = 0
-    rng = random.Random(random_seed)
+
     qst_vocab_dict = text_processing.VocabDict(question_vocab_file)
     ans_vocab_dict = text_processing.VocabDict(answer_vocab_file)
-    dupe_factor = 10
+    is_pretrain = True
     masked_lm_prob = 0.15
     max_predictions_per_seq = 8
+
+    if is_pretrain:
+        dupe_factor = 5
+        rng = random.Random(random_seed)
+        name_prefix = 'masked_'
+    else:
+        dupe_factor = 1
+        rng = None
+        name_prefix = ''
 
     imdb_train = build_base_imdb('train')
     imdb_dev = build_base_imdb('dev')
@@ -298,24 +313,24 @@ if __name__ == '__main__':
     np.save('./imdb_r152_7x7/imdb_dev.npy', imdb_dev)
     np.save('./imdb_r152_7x7/imdb_test.npy', imdb_test)
 
-    print("Creating dataset instances")
-    train_instances = create_dataset_instances(imdb_train, 'train', dupe_factor, masked_lm_prob,
+    train_instances = create_dataset_instances(imdb_train, name_prefix + 'train', dupe_factor, masked_lm_prob,
                                                max_predictions_per_seq, qst_vocab_dict.word_list, rng)
 
-    rng.shuffle(train_instances)
+    if rng is not None:
+        rng.shuffle(train_instances)
 
-    dev_instances = create_dataset_instances(imdb_dev, 'dev', dupe_factor, masked_lm_prob, max_predictions_per_seq,
-                                             qst_vocab_dict.word_list, rng)
-    # test_instances = create_dataset_instances(imdb_dev, 'dev', masked_lm_prob, max_predictions_per_seq,
+    dev_instances = create_dataset_instances(imdb_dev,  name_prefix + 'dev', dupe_factor, masked_lm_prob,
+                                             max_predictions_per_seq, qst_vocab_dict.word_list, rng)
+    # test_instances = create_dataset_instances(imdb_test, 'test', masked_lm_prob, max_predictions_per_seq,
     #                                           question_vocab_dict.word_list, rng)
 
     os.makedirs(datasets_dir, exist_ok=True)
 
     num_instances_per_shard = 150
 
-    convert_instances_to_tfrecords('train', train_instances, num_instances_per_shard, global_max_len,
-                                   qst_vocab_dict, ans_vocab_dict)
-    convert_instances_to_tfrecords('dev', dev_instances, num_instances_per_shard, global_max_len,
-                                   qst_vocab_dict, ans_vocab_dict)
+    convert_instances_to_tfrecords(name_prefix + 'train', train_instances, num_instances_per_shard, global_max_len,
+                                   max_predictions_per_seq, qst_vocab_dict, ans_vocab_dict)
+    convert_instances_to_tfrecords(name_prefix + 'dev', dev_instances, num_instances_per_shard, global_max_len,
+                                   max_predictions_per_seq, qst_vocab_dict, ans_vocab_dict)
     # convert_instances_to_tfrecords('test', test_instances, num_instances_per_shard, global_max_len,
-    #                                qst_vocab_dict, ans_vocab_dict)
+    #                                max_predictions_per_seq, qst_vocab_dict, ans_vocab_dict)

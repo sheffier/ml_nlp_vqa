@@ -93,17 +93,6 @@ class PreTrainOutputs:
             self.masked_lm_labels = tf.gather_nd(masked_lm_ids_batch, t_mask)
             self.masked_lm_scores = tf.gather_nd(tf.reshape(out_scores, [N, max_pred, -1]), t_mask)
 
-            # lm_scores = tf.reshape(out_scores, (N, S, (num_vocab + 1)))
-            #
-            # mask_idx = tf.constant([1.0])
-            # temp = tf.where(tf.equal(tf.transpose(masked_lm_weights_batch, perm=[1, 0]), mask_idx))
-            # # self.indices = tf.where(tf.not_equal(tf.transpose(output_seq_batch, perm=[1, 0]), mask_idx))
-            #
-            # self.indices = tf.gather_nd(tf.transpose(masked_lm_positions_batch, perm=[1, 0]), temp)
-            # # self.masked_lm_labels = tf.gather_nd(tf.transpose(output_seq_batch, perm=[1, 0]), self.indices)
-            # self.masked_lm_labels = tf.gather_nd(tf.transpose(masked_lm_ids_batch, perm=[1, 0]), self.indices)
-            # self.masked_lm_scores = tf.gather_nd(lm_scores, self.indices)
-
 
 class TrainingOutputs:
     def __init__(self, model, input_seq_batch, seq_length_batch, num_vocab, num_choices, dropout_keep_prob,
@@ -176,13 +165,12 @@ class BaseModel:
 class PreTrainModel:
     def __init__(self, inputs, num_vocab,
                  module_names, scope='full_model', reuse=None):
+        self.answer_batch = inputs["answer"]
         input_seq_batch = inputs["input_ids"]
         seq_length_batch = inputs["seq_length"]
         masked_lm_positions_batch = inputs["masked_lm_positions"]
         masked_lm_ids_batch = inputs["masked_lm_ids"]
         masked_lm_weights_batch = inputs["masked_lm_weights"]
-        self.answer_batch = inputs["answer"]
-        # inputs["image_id"]
         image_feat_batch = inputs["img_features"]
 
         input_seq_batch = tf.transpose(input_seq_batch, perm=[1, 0])
@@ -190,10 +178,6 @@ class PreTrainModel:
         max_seq_len = tf.shape(input_seq_batch)[0]
         batch_size = tf.shape(input_seq_batch)[1]
         max_pred = tf.shape(masked_lm_weights_batch)[1]
-
-        # masked_lm_positions_batch = tf.transpose(masked_lm_positions_batch, perm=[1, 0])
-        # masked_lm_ids_batch = tf.transpose(masked_lm_ids_batch, perm=[1, 0])
-        # masked_lm_weights_batch = tf.transpose(masked_lm_weights_batch, perm=[1, 0])
 
         with tf.variable_scope(scope, reuse=reuse):
             self.base_model = BaseModel(input_seq_batch, seq_length_batch, image_feat_batch, num_vocab, module_names,
@@ -213,8 +197,15 @@ class PreTrainModel:
 
 
 class TrainingModel:
-    def __init__(self, input_seq_batch, seq_length_batch, image_feat_batch, num_vocab, num_choices, module_names,
-                 dropout_keep_prob, scope='full_model', reuse=None):
+    def __init__(self, inputs, num_vocab, module_names, num_choices, dropout_keep_prob,
+                 scope='full_model', reuse=None):
+        self.answer_batch = inputs["answer"]
+        input_seq_batch = inputs["input_ids"]
+        seq_length_batch = inputs["seq_length"]
+        image_feat_batch = inputs["img_features"]
+
+        input_seq_batch = tf.transpose(input_seq_batch, perm=[1, 0])
+
         with tf.variable_scope(scope, reuse=reuse):
             self.base_model = BaseModel(input_seq_batch, seq_length_batch, image_feat_batch, num_vocab, module_names,
                                         reuse=reuse)
@@ -227,3 +218,41 @@ class TrainingModel:
             self.l2_reg = tf.add_n(
                 [tf.nn.l2_loss(v) for v in self.params
                  if v.op.name.endswith('weights')])
+
+            # tensors for visualization
+            self.vis_outputs = {
+                'txt_att':  # [N, T, S]
+                tf.transpose(  # [S, N, T] -> [N, T, S]
+                    tf.concat(self.base_model.controller.cv_list, axis=2), (1, 2, 0)),
+                'att_stack':  # [N, T, H, W, L]
+                tf.stack(self.base_model.nmn.att_stack_list, axis=1),
+                'stack_ptr':  # [N, T, L]
+                tf.stack(self.base_model.nmn.stack_ptr_list, axis=1),
+                'module_prob':  # [N, T, D]
+                tf.stack(self.base_model.module_prob_list, axis=1)}
+            if cfg.MODEL.BUILD_VQA:
+                self.vis_outputs['vqa_scores'] = self.out.vqa_scores
+            if cfg.MODEL.BUILD_LOC:
+                self.vis_outputs['loc_scores'] = self.out.loc_scores
+                self.vis_outputs['bbox_offset'] = self.out.bbox_offset
+
+    def bbox_offset_loss(self, bbox_ind_batch, bbox_offset_batch):
+        if cfg.MODEL.BBOX_REG_AS_FCN:
+            N = tf.shape(self.out.bbox_offset_fcn)[0]
+            B = tf.shape(self.out.bbox_offset_fcn)[1]  # B = H*W
+            bbox_offset_flat = tf.reshape(self.out.bbox_offset_fcn, to_T([N*B, 4]))
+            slice_inds = tf.range(N) * B + bbox_ind_batch
+            bbox_offset_sliced = tf.gather(bbox_offset_flat, slice_inds)
+            loss_bbox_offset = tf.reduce_mean(
+                tf.squared_difference(bbox_offset_sliced, bbox_offset_batch))
+        else:
+            loss_bbox_offset = tf.reduce_mean(
+                tf.squared_difference(self.out.bbox_offset, bbox_offset_batch))
+
+        return loss_bbox_offset
+
+    def vis_batch_vqa(self, *args):
+        vis.vis_batch_vqa(self, *args)
+
+    def vis_batch_loc(self, *args):
+        vis.vis_batch_loc(self, *args)

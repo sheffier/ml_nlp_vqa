@@ -9,20 +9,31 @@ import tensorflow as tf
 from tqdm import tqdm
 from models_nlvr.config import (
     cfg, merge_cfg_from_file, merge_cfg_from_list)
-from models_nlvr.model import PreTrainModel
+from models_nlvr.model import TrainingModel
 from util import text_processing
 from util.nlvr_train.data_pipeline import prepare_dataset_iterators
 
 
 def model_metrics(model):
     # Loss function
-    masked_lm_loss_per_sample = tf.nn.sparse_softmax_cross_entropy_with_logits(
-        logits=model.out.masked_lm_scores, labels=model.out.masked_lm_labels)
+    loss_vqa_per_sample = tf.nn.sparse_softmax_cross_entropy_with_logits(
+        logits=model.out.vqa_scores, labels=model.answer_batch)
 
-    masked_lm_loss_acumm = tf.reduce_sum(masked_lm_loss_per_sample)
-    loss_masked_lm = tf.reduce_mean(masked_lm_loss_per_sample)
+    loss_vqa_acumm = tf.reduce_sum(loss_vqa_per_sample)
+    loss_vqa = tf.reduce_mean(loss_vqa_per_sample)
 
-    loss_total = loss_masked_lm + cfg.TRAIN.WEIGHT_DECAY * model.l2_reg
+    if cfg.TRAIN.USE_GT_LAYOUT:
+        gt_layout_batch = tf.placeholder(tf.int32, [None, None])
+        loss_layout = tf.reduce_mean(
+            tf.nn.sparse_softmax_cross_entropy_with_logits(
+                logits=model.base_model.module_logits, labels=gt_layout_batch))
+    else:
+        loss_layout = tf.convert_to_tensor(0.)
+    loss_rec = model.out.rec_loss
+    loss_train = (loss_vqa * cfg.TRAIN.VQA_LOSS_WEIGHT +
+                  loss_layout * cfg.TRAIN.LAYOUT_LOSS_WEIGHT +
+                  loss_rec * cfg.TRAIN.REC_LOSS_WEIGHT)
+    loss_total = loss_train + cfg.TRAIN.WEIGHT_DECAY * model.l2_reg
 
     solver = tf.train.AdamOptimizer(learning_rate=cfg.TRAIN.SOLVER.LR)
     solver_op = solver.minimize(loss_total)
@@ -32,7 +43,7 @@ def model_metrics(model):
     with tf.control_dependencies([solver_op]):
         train_op = tf.group(ema_op)
 
-    return masked_lm_loss_acumm, loss_masked_lm, train_op
+    return loss_total, loss_vqa, loss_vqa_acumm, loss_layout, loss_rec, train_op
 
 
 if __name__ == "__main__":
@@ -50,7 +61,7 @@ if __name__ == "__main__":
     os.environ["CUDA_VISIBLE_DEVICES"] = str(cfg.GPU_ID)
 
     experiment = Experiment(api_key="uXl6JxxbmcanY3sv7C9ECrL59", project_name='ml-nlp-vqa')
-    experiment.add_tag("pretraining-new-model")
+    experiment.add_tag("training-new-model")
 
     hyper_params = {"batch_size": cfg.TRAIN.BATCH_SIZE, "feature_dim": cfg.MODEL.FEAT_DIM}
     experiment.log_parameters(hyper_params)
@@ -66,14 +77,18 @@ if __name__ == "__main__":
 
     num_vocab = qst_vocab_dict.num_vocab
     module_names = layout_vocab_dict.word_list
+    num_choices = ans_vocab_dict.num_vocab
 
-    train_file_pattern = os.path.join(dataset_dir, 'masked_train_*.tfrecord')
-    val_file_pattern = os.path.join(dataset_dir, 'masked_dev_*.tfrecord')
-    next_batch_op, training_init_op, validation_init_op = prepare_dataset_iterators(train_file_pattern, val_file_pattern)
+    train_file_pattern = os.path.join(dataset_dir, 'train_*.tfrecord')
+    val_file_pattern = os.path.join(dataset_dir, 'dev_*.tfrecord')
+    next_batch_op, training_init_op, validation_init_op = prepare_dataset_iterators(train_file_pattern,
+                                                                                    val_file_pattern)
 
-    model = PreTrainModel(next_batch_op, num_vocab, module_names)
+    dropout_keep_prob = tf.placeholder(tf.float32, shape=())
 
-    masked_lm_loss_acumm, loss_masked_lm, train_op = model_metrics(model)
+    model = TrainingModel(next_batch_op, num_vocab, module_names, num_choices, dropout_keep_prob)
+
+    loss_total, loss_vqa, loss_vqa_acumm, loss_layout, loss_rec, train_op = model_metrics(model)
 
     with tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=cfg.GPU_MEM_GROWTH))) as sess:
         sess.run(tf.global_variables_initializer())
@@ -81,42 +96,41 @@ if __name__ == "__main__":
         # Save snapshot
         snapshot_dir = cfg.TRAIN.SNAPSHOT_DIR % cfg.EXP_NAME
         os.makedirs(snapshot_dir, exist_ok=True)
-        variables_to_save = model.base_model.get_variable_list()
-        snapshot_saver = tf.train.Saver(variables_to_save, max_to_keep=None)  # keep all snapshots
-        epochs = 100
-        files = tf.gfile.Glob(train_file_pattern)[0:1]
+        snapshot_saver = tf.train.Saver(max_to_keep=None)  # keep all snapshots
 
+        best_val_acc = 0.
+        best_val_epoch = 0
         avg_accuracy, accuracy_decay = 0., 0.99
         n_iter = 0
+        num_epochs = 100
 
-        with tqdm(total=math.ceil((len(files) * epochs * 150) / 128), file=sys.stdout) as pbar:
+        with tqdm(total=math.ceil((len(tf.gfile.Glob(train_file_pattern)) * num_epochs * 150) / 128), file=sys.stdout) as pbar:
             pbar.set_description('[%s]' % cfg.EXP_NAME)
-            for epoch in range(epochs):
+            for epoch in range(num_epochs):
                 sess.run(training_init_op)
-
                 while True:
                     try:
                         n_iter += 1
 
-                        lm_scores_value, loss_masked_lm_value, masked_lm_labels_value, _ = sess.run(
-                            (model.out.masked_lm_scores, loss_masked_lm, model.out.masked_lm_labels,
-                             train_op))
+                        vqa_scores_val, answer_labels, loss_vqa_val, loss_layout_val, loss_rec_val, _ = sess.run(
+                            (model.out.vqa_scores, model.answer_batch, loss_vqa, loss_layout, loss_rec, train_op),
+                            {dropout_keep_prob: cfg.TRAIN.DROPOUT_KEEP_PROB})
 
                         # compute accuracy
-                        lm_predictions = np.argmax(lm_scores_value, axis=1)
-                        accuracy = np.mean(lm_predictions == masked_lm_labels_value)
+                        vqa_predictions = np.argmax(vqa_scores_val, axis=1)
+                        accuracy = np.mean(vqa_predictions == answer_labels)
                         avg_accuracy += (1 - accuracy_decay) * (accuracy - avg_accuracy)
 
                         pbar.update(1)
 
                         # Add to TensorBoard summary
                         if n_iter % cfg.TRAIN.LOG_INTERVAL == 0:
-                            pbar.set_postfix(iter=n_iter, loss=loss_masked_lm_value,
+                            pbar.set_postfix(iter=n_iter, epoch=epoch, loss=loss_vqa_val,
                                              acc=accuracy, avg_acc=avg_accuracy)
 
-                            experiment.log_metric("[PRE-TRAIN] loss (vqa)", loss_masked_lm_value, step=n_iter)
-                            experiment.log_metric("[PRE-TRAIN] accuracy (cur)", accuracy, step=n_iter)
-                            experiment.log_metric("[PRE-TRAIN] accuracy (avg)", avg_accuracy, step=n_iter)
+                            experiment.log_metric("[TRAIN] loss (vqa)", loss_vqa_val, step=n_iter)
+                            experiment.log_metric("[TRAIN] accuracy (cur)", accuracy, step=n_iter)
+                            experiment.log_metric("[TRAIN] accuracy (avg)", avg_accuracy, step=n_iter)
 
                         if (n_iter % cfg.TRAIN.SNAPSHOT_INTERVAL == 0 or
                                 n_iter == cfg.TRAIN.MAX_ITER):
@@ -135,17 +149,16 @@ if __name__ == "__main__":
                 while True:
                     # As long as the iterator is not empty
                     try:
-                        lm_scores_value, val_loss_masked_lm, masked_lm_labels_value = sess.run(
-                            (model.out.masked_lm_scores,
-                             masked_lm_loss_acumm,
-                             model.out.masked_lm_labels))
+                        vqa_scores_val, answer_labels, val_loss_vqa = \
+                            sess.run((model.out.vqa_scores, model.answer_batch, loss_vqa_acumm),
+                                     {dropout_keep_prob: 1.})
 
                         # compute accuracy
-                        lm_predictions = np.argmax(lm_scores_value, axis=1)
+                        vqa_predictions = np.argmax(vqa_scores_val, axis=1)
 
-                        n_samples += len(masked_lm_labels_value)
-                        answer_correct += np.sum(lm_predictions == masked_lm_labels_value)
-                        val_avg_loss += val_loss_masked_lm
+                        n_samples += len(answer_labels)
+                        answer_correct += np.sum(vqa_predictions == answer_labels)
+                        val_avg_loss += val_loss_vqa
                     except tf.errors.OutOfRangeError:
                         # Update the average loss for the epoch
                         val_accuracy = answer_correct / n_samples
@@ -156,10 +169,6 @@ if __name__ == "__main__":
                             best_val_epoch = epoch
                             snapshot_file = os.path.join(snapshot_dir, "best_val")
                             snapshot_saver.save(sess, snapshot_file, write_meta_graph=False)
-
-                        # pbar.set_description('[%s | VAL]' % cfg.EXP_NAME)
-                        # pbar.set_postfix(epoch=epoch, loss=val_avg_loss,
-                        #                  avg_acc=avg_accuracy, best_acc=best_val_acc)
 
                         pbar.write("[VAL] epoch = %d, loss %f, acc %f (best_acc %f @epoch %d)" %
                                    (epoch, val_avg_loss, val_accuracy, best_val_acc, best_val_epoch))
