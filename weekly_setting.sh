@@ -88,6 +88,7 @@ create_env () {
     conda install --yes -c anaconda tensorflow tensorflow-gpu scikit-image pyyaml humanfriendly jupyter
     conda install --yes -c conda-forge tqdm
     pip install comet-ml
+    pip install prefetch_generator
     conda update --yes --all
 }
 ensure_done create_env $CONDA_PROJ_ENV

@@ -116,7 +116,7 @@ if __name__ == "__main__":
                              train_acc_avg=train_avg_accuracy,
                              val_loss=0., val_acc_last_epoch=val_accuracy, val_acc_best=val_best_acc)
             for epoch in range(n_epochs):
-                sess.run(training_init_op, {train_filenames_ph: train_sampled_ds.sample_dataset()})
+                sess.run(training_init_op, {train_filenames_ph: next(train_sampled_ds)})
 
                 while True:
                     try:
@@ -154,7 +154,7 @@ if __name__ == "__main__":
                         break
 
                 # run validation
-                sess.run(validation_init_op, {val_filenames_ph: val_sampled_ds.sample_dataset()})
+                sess.run(validation_init_op, {val_filenames_ph: next(val_sampled_ds)})
                 n_samples = 0
                 answer_correct = 0
                 val_avg_loss = 0.

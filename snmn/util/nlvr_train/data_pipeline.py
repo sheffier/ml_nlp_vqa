@@ -1,6 +1,7 @@
 import multiprocessing
 import tensorflow as tf
 import numpy as np
+from prefetch_generator import background
 
 
 #===============DEFINE YOUR ARGUMENTS==============
@@ -23,10 +24,17 @@ class RandomMaskedDataset(object):
         self.n_shards_per_dup = n_shards_per_dup
         self.file_array = np.array(file_list).reshape([n_dups, n_shards_per_dup])
 
-    def sample_dataset(self):
-        rnd_idx = np.random.randint(0, self.n_dups, size=self.n_shards_per_dup)
+        @background(max_prefetch=3)
+        def dataset_gen():
+            while True:
+                rnd_idx = np.random.randint(0, self.n_dups, size=self.n_shards_per_dup)
 
-        return self.file_array[rnd_idx, np.arange(self.n_shards_per_dup)]
+                yield self.file_array[rnd_idx, np.arange(self.n_shards_per_dup)]
+
+        self.gen = dataset_gen()
+
+    def __next__(self):
+        return self.gen.__next__()
 
 
 def create_masked_dataset(file_list, batch_size, max_seq_length, max_predictions_per_seq,
