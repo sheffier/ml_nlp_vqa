@@ -87,7 +87,7 @@ def extract_dataset_resnet152_c5_7x7(image_dir, save_dir, ext_filter='*-img0.png
     image_list = glob(image_dir + '/' + ext_filter)
     os.makedirs(save_dir, exist_ok=True)
 
-    for n_im, impath0 in reversed(list(enumerate(image_list))[:20500]):
+    for n_im, impath0 in enumerate(image_list):
         if (n_im+1) % 100 == 0:
             print('processing %d / %d' % (n_im+1, len(image_list)))
         image_name = os.path.basename(impath0).split('.')[0].replace('-img0', '')
@@ -97,8 +97,6 @@ def extract_dataset_resnet152_c5_7x7(image_dir, save_dir, ext_filter='*-img0.png
             resnet152_c5_val1 = extract_image_resnet152_c5_7x7(impath0.replace('-img0', '-img1'))
             resnet152_c5_val = np.concatenate([resnet152_c5_val0, resnet152_c5_val1], axis=2)
             np.save(save_path, resnet152_c5_val)
-
-    exit(999)
 
 
 print(image_basedir)

@@ -24,7 +24,7 @@ do
   read -r GIT_BRANCH_NAME
 done
 
-GPU_ID=${GPU_ID:-0}
+GPU_ID=${GPU_ID:-best}
 CONDA_PROJ_ENV=NLP
 
 while [[ "$1" != "" ]]; do
