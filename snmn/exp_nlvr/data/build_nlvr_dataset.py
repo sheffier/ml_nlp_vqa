@@ -35,6 +35,21 @@ class TrainingInstance(object):
         self.feature_path = feature_path
 
 
+class TrainingDataset(object):
+    def __init__(self, id):
+        self.id = id
+        self.instances = []
+
+    def __len__(self):
+        return len(self.instances)
+
+    def add_instance(self, instance):
+        self.instances.append(instance)
+
+    def shuffle_instances(self, rng):
+        rng.shuffle(train_instances)
+
+
 MaskedLmInstance = collections.namedtuple("MaskedLmInstance",
                                           ["index", "label"])
 
@@ -51,8 +66,8 @@ def _float_feature_from_list(value):
     return tf.train.Feature(float_list=tf.train.FloatList(value=list(value)))
 
 
-def get_tfrecord_filename(output_path, split_name, shard_id, num_shards):
-    output_filename = '%s_%05d-of-%05d.tfrecord' % (split_name, shard_id, num_shards)
+def get_tfrecord_filename(output_path, split_name, ds_id, shard_id, num_shards):
+    output_filename = '%s_d%d_%05d-of-%05d.tfrecord' % (split_name, ds_id, shard_id, num_shards)
     return os.path.join(output_path, output_filename)
 
 
@@ -175,7 +190,8 @@ def create_dataset_instances(base_imdb, split_name, dupe_factor, masked_lm_prob,
 
     with tqdm(total=dupe_factor * len(base_imdb)) as pbar:
         pbar.set_description("[%s] creating instance dataset" % split_name)
-        for _ in range(dupe_factor):
+        for dupe_id in range(dupe_factor):
+            dataset = TrainingDataset(dupe_id)
             for iminfo in base_imdb:
                 tokens = iminfo["question_tokens"]
                 answer = iminfo['answer']
@@ -193,9 +209,11 @@ def create_dataset_instances(base_imdb, split_name, dupe_factor, masked_lm_prob,
                     image_id=image_id,
                     feature_path=feature_path
                 )
-                instances.append(instance)
+                dataset.add_instance(instance)
 
                 pbar.update(1)
+
+            instances.append(dataset)
 
     return instances
 
@@ -264,24 +282,30 @@ def build_base_imdb(image_set):
 
 def convert_instances_to_tfrecords(split_name, instances, num_instances_per_shard, max_seq_length,
                                    max_predictions_per_seq, qst_vocab_dict, ans_vocab_dict):
-    n_instances = len(instances)
-    num_shards = int(math.ceil(n_instances / num_instances_per_shard))
+    n_instances = 0
+    total_shards = 0
+    for dataset in instances:
+        n_instances += len(dataset)
+        total_shards += int(math.ceil(len(dataset) / num_instances_per_shard))
 
     pool = Pool()
-    pbar = tqdm(total=num_shards)
+    pbar = tqdm(total=total_shards)
 
     pbar.set_description("Converting %s imdb to tfrecords: " % split_name)
 
     def update(*a):
         pbar.update()
 
-    for i in range(pbar.total):
-        output_filename = get_tfrecord_filename(datasets_dir, split_name, i, num_shards)
-        inst_slice = instances[i * num_instances_per_shard:i * num_instances_per_shard + num_instances_per_shard]
-        pool.apply_async(convert_to_tfrecord,
-                         args=(inst_slice, output_filename, max_seq_length, max_predictions_per_seq,
-                               qst_vocab_dict, ans_vocab_dict),
-                         callback=update)
+    for dataset in instances:
+        n_shards = int(math.ceil(len(dataset) / num_instances_per_shard))
+        for shard_id in range(n_shards):
+            output_filename = get_tfrecord_filename(datasets_dir, split_name, dataset.id, shard_id, n_shards)
+            inst_slice = dataset.instances[shard_id * num_instances_per_shard:
+                                           shard_id * num_instances_per_shard + num_instances_per_shard]
+            pool.apply_async(convert_to_tfrecord,
+                             args=(inst_slice, output_filename, max_seq_length, max_predictions_per_seq,
+                                   qst_vocab_dict, ans_vocab_dict),
+                             callback=update)
     pool.close()
     pool.join()
 
@@ -308,10 +332,12 @@ if __name__ == '__main__':
     max_predictions_per_seq = 8
 
     if is_pretrain:
+        print("Creating pre-train dataset")
         dupe_factor = 5
         rng = random.Random(random_seed)
         name_prefix = 'masked_'
     else:
+        print("Creating training dataset")
         dupe_factor = 1
         rng = None
         name_prefix = ''
@@ -328,9 +354,6 @@ if __name__ == '__main__':
     train_instances = create_dataset_instances(imdb_train, name_prefix + 'train', dupe_factor, masked_lm_prob,
                                                max_predictions_per_seq, qst_vocab_dict.word_list, rng)
 
-    if rng is not None:
-        rng.shuffle(train_instances)
-
     dev_instances = create_dataset_instances(imdb_dev,  name_prefix + 'dev', dupe_factor, masked_lm_prob,
                                              max_predictions_per_seq, qst_vocab_dict.word_list, rng)
     # test_instances = create_dataset_instances(imdb_test, 'test', masked_lm_prob, max_predictions_per_seq,
@@ -344,5 +367,5 @@ if __name__ == '__main__':
                                    max_predictions_per_seq, qst_vocab_dict, ans_vocab_dict)
     convert_instances_to_tfrecords(name_prefix + 'dev', dev_instances, num_instances_per_shard, global_max_len,
                                    max_predictions_per_seq, qst_vocab_dict, ans_vocab_dict)
-    # convert_instances_to_tfrecords('test', test_instances, num_instances_per_shard, global_max_len,
+    # convert_instances_to_tfrecords('test', test_instances, dupe_factor, num_instances_per_shard, global_max_len,
     #                                max_predictions_per_seq, qst_vocab_dict, ans_vocab_dict)

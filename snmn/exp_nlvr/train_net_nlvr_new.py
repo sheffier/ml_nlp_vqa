@@ -8,7 +8,7 @@ import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
 from models_nlvr.config import (
-    cfg, merge_cfg_from_file, merge_cfg_from_list)
+    cfg, merge_cfg_from_file, merge_cfg_from_list, evaluate_final_cfg)
 from models_nlvr.model import TrainingModel
 from util import text_processing
 from util.nlvr_train.data_pipeline import prepare_dataset_iterators
@@ -35,7 +35,7 @@ def model_metrics(model):
                   loss_rec * cfg.TRAIN.REC_LOSS_WEIGHT)
     loss_total = loss_train + cfg.TRAIN.WEIGHT_DECAY * model.l2_reg
 
-    solver = tf.train.AdamOptimizer(learning_rate=cfg.TRAIN.SOLVER.LR)
+    solver = tf.train.AdamOptimizer(learning_rate=model.lr)
     solver_op = solver.minimize(loss_total)
     # Save moving average of parameters
     ema = tf.train.ExponentialMovingAverage(decay=cfg.TRAIN.EMV_DECAY)
@@ -57,6 +57,8 @@ if __name__ == "__main__":
     assert cfg.EXP_NAME == os.path.basename(args.cfg).replace('.yaml', '')
     if args.opts:
         merge_cfg_from_list(args.opts)
+
+    evaluate_final_cfg()
 
     os.environ["CUDA_VISIBLE_DEVICES"] = str(cfg.GPU_ID)
 
@@ -84,9 +86,7 @@ if __name__ == "__main__":
     next_batch_op, training_init_op, validation_init_op = prepare_dataset_iterators(train_file_pattern,
                                                                                     val_file_pattern)
 
-    dropout_keep_prob = tf.placeholder(tf.float32, shape=())
-
-    model = TrainingModel(next_batch_op, num_vocab, module_names, num_choices, dropout_keep_prob)
+    model = TrainingModel(next_batch_op, num_vocab, module_names, num_choices)
 
     loss_total, loss_vqa, loss_vqa_acumm, loss_layout, loss_rec, train_op = model_metrics(model)
 
@@ -98,46 +98,61 @@ if __name__ == "__main__":
         os.makedirs(snapshot_dir, exist_ok=True)
         snapshot_saver = tf.train.Saver(max_to_keep=None)  # keep all snapshots
 
-        best_val_acc = 0.
-        best_val_epoch = 0
-        avg_accuracy, accuracy_decay = 0., 0.99
+        val_best_acc = 0.
+        val_best_epoch = 0
+        train_loss_vqa = 0.
+        train_accuracy = 0.
+        train_avg_accuracy = 0.
+        accuracy_decay = 0.99
+
+        new_val_avg_loss = 100.
+        old_val_avg_loss = 100.
+        val_accuracy = 0.
+
         n_iter = 0
         num_epochs = 100
+        keep_prob = cfg.TRAIN.DROPOUT_KEEP_PROB
+        lr = cfg.TRAIN.SOLVER.LR
 
         with tqdm(total=math.ceil((len(tf.gfile.Glob(train_file_pattern)) * num_epochs * 150) / 128), file=sys.stdout) as pbar:
             pbar.set_description('[%s]' % cfg.EXP_NAME)
+            pbar.set_postfix(iter=n_iter, epoch=0,
+                             train_loss=train_loss_vqa, train_acc=train_accuracy,
+                             train_acc_avg=train_avg_accuracy,
+                             val_loss=0., val_acc_last_epoch=val_accuracy)
             for epoch in range(num_epochs):
                 sess.run(training_init_op)
                 while True:
                     try:
                         n_iter += 1
 
-                        vqa_scores_val, answer_labels, loss_vqa_val, loss_layout_val, loss_rec_val, _ = sess.run(
+                        vqa_scores_val, answer_labels, train_loss_vqa, loss_layout_val, loss_rec_val, _ = sess.run(
                             (model.out.vqa_scores, model.answer_batch, loss_vqa, loss_layout, loss_rec, train_op),
-                            {dropout_keep_prob: cfg.TRAIN.DROPOUT_KEEP_PROB})
+                            feed_dict={model.lr: lr, model.dropout_keep_prob: keep_prob})
 
                         # compute accuracy
                         vqa_predictions = np.argmax(vqa_scores_val, axis=1)
-                        accuracy = np.mean(vqa_predictions == answer_labels)
-                        avg_accuracy += (1 - accuracy_decay) * (accuracy - avg_accuracy)
+                        train_accuracy = np.mean(vqa_predictions == answer_labels)
+                        train_avg_accuracy += (1 - accuracy_decay) * (train_accuracy - train_avg_accuracy)
 
                         pbar.update(1)
 
                         # Add to TensorBoard summary
                         if n_iter % cfg.TRAIN.LOG_INTERVAL == 0:
-                            pbar.set_postfix(iter=n_iter, epoch=epoch, loss=loss_vqa_val,
-                                             acc=accuracy, avg_acc=avg_accuracy)
+                            pbar.set_postfix(iter=n_iter, epoch=epoch,
+                                             train_loss=train_loss_vqa, train_acc=train_accuracy,
+                                             train_acc_avg=train_avg_accuracy,
+                                             val_loss=0 if epoch == 0 else new_val_avg_loss,
+                                             val_acc_last_epoch=val_accuracy)
 
-                            experiment.log_metric("[TRAIN] loss (vqa)", loss_vqa_val, step=n_iter)
-                            experiment.log_metric("[TRAIN] accuracy (cur)", accuracy, step=n_iter)
-                            experiment.log_metric("[TRAIN] accuracy (avg)", avg_accuracy, step=n_iter)
+                            experiment.log_metric("train/loss_vqa", train_loss_vqa, step=n_iter)
+                            experiment.log_metric("train/acc", train_accuracy, step=n_iter)
+                            experiment.log_metric("train/avg_acc", train_accuracy, step=n_iter)
 
                         if (n_iter % cfg.TRAIN.SNAPSHOT_INTERVAL == 0 or
                                 n_iter == cfg.TRAIN.MAX_ITER):
                             snapshot_file = os.path.join(snapshot_dir, str(n_iter))
                             snapshot_saver.save(sess, snapshot_file, write_meta_graph=False)
-                            # pbar.set_description('snapshot saved to ' + snapshot_file)
-
                     except tf.errors.OutOfRangeError:
                         break
 
@@ -151,7 +166,7 @@ if __name__ == "__main__":
                     try:
                         vqa_scores_val, answer_labels, val_loss_vqa = \
                             sess.run((model.out.vqa_scores, model.answer_batch, loss_vqa_acumm),
-                                     {dropout_keep_prob: 1.})
+                                     feed_dict={model.lr: lr, model.dropout_keep_prob: 1.})
 
                         # compute accuracy
                         vqa_predictions = np.argmax(vqa_scores_val, axis=1)
@@ -161,21 +176,24 @@ if __name__ == "__main__":
                         val_avg_loss += val_loss_vqa
                     except tf.errors.OutOfRangeError:
                         # Update the average loss for the epoch
+                        old_val_avg_loss = new_val_avg_loss
                         val_accuracy = answer_correct / n_samples
-                        val_avg_loss = val_avg_loss / n_samples
+                        new_val_avg_loss = val_avg_loss / n_samples
 
-                        if val_accuracy > best_val_acc:
-                            best_val_acc = val_accuracy
-                            best_val_epoch = epoch
+                        if val_accuracy > val_best_acc:
+                            val_best_acc = val_accuracy
+                            val_best_epoch = epoch
                             snapshot_file = os.path.join(snapshot_dir, "best_val")
                             snapshot_saver.save(sess, snapshot_file, write_meta_graph=False)
 
-                        pbar.write("[VAL] epoch = %d, loss %f, acc %f (best_acc %f @epoch %d)" %
-                                   (epoch, val_avg_loss, val_accuracy, best_val_acc, best_val_epoch))
+                        pbar.set_postfix(iter=n_iter, epoch=epoch,
+                                         train_loss=train_loss_vqa, train_acc=train_accuracy,
+                                         train_acc_avg=train_avg_accuracy,
+                                         val_loss=new_val_avg_loss, val_acc_last_epoch=val_accuracy)
 
-                        experiment.log_metric("[VAL] loss (vqa)", val_avg_loss, step=n_iter)
-                        experiment.log_metric("[VAL] accuracy (cur)", val_accuracy, step=n_iter)
-                        experiment.log_metric("[VAL] best accuracy", best_val_acc, step=n_iter)
-                        experiment.log_metric("[VAL] best val epoch", best_val_epoch, step=n_iter)
+                        experiment.log_metric("val/loss_vqa", new_val_avg_loss, step=n_iter)
+                        experiment.log_metric("val/acc_last_epoch", val_accuracy, step=n_iter)
+                        experiment.log_metric("val/best_acc", val_best_acc, step=n_iter)
+                        experiment.log_metric("val/best_epoch", val_best_epoch, step=n_iter)
 
                         break

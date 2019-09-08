@@ -165,6 +165,7 @@ class BaseModel:
 class PreTrainModel:
     def __init__(self, inputs, num_vocab,
                  module_names, scope='full_model', reuse=None):
+        self.lr = tf.placeholder(tf.float32, shape=())
         self.answer_batch = inputs["answer"]
         input_seq_batch = inputs["input_ids"]
         seq_length_batch = inputs["seq_length"]
@@ -197,8 +198,11 @@ class PreTrainModel:
 
 
 class TrainingModel:
-    def __init__(self, inputs, num_vocab, module_names, num_choices, dropout_keep_prob,
+    def __init__(self, inputs, num_vocab, module_names, num_choices,
                  scope='full_model', reuse=None):
+        self.lr = tf.placeholder(tf.float32, shape=())
+        self.dropout_keep_prob = tf.placeholder(tf.float32, shape=())
+
         self.answer_batch = inputs["answer"]
         input_seq_batch = inputs["input_ids"]
         seq_length_batch = inputs["seq_length"]
@@ -211,7 +215,7 @@ class TrainingModel:
                                         reuse=reuse)
 
             self.out = TrainingOutputs(self.base_model, input_seq_batch, seq_length_batch,
-                                       num_vocab, num_choices, dropout_keep_prob)
+                                       num_vocab, num_choices, self.dropout_keep_prob)
 
             self.params = [
                 v for v in tf.trainable_variables() if scope in v.op.name]
