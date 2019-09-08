@@ -58,7 +58,7 @@ def create_dataset(file_pattern, batch_size, max_seq_length, max_predictions_per
 
         dataset = dataset.map(_parse, num_parallel_calls=threads)
 
-        dataset = dataset.batch(batch_size=batch_size)
+        dataset = dataset.batch(batch_size=batch_size, drop_remainder=is_training)
 
         dataset = dataset.prefetch(buffer_size=batch_size)
 
