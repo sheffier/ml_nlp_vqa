@@ -52,11 +52,9 @@ input_seq_batch = tf.placeholder(tf.int32, [None, None])
 seq_length_batch = tf.placeholder(tf.int32, [None])
 image_feat_batch = tf.placeholder(
     tf.float32, [None, cfg.MODEL.H_FEAT, 2 * cfg.MODEL.W_FEAT, cfg.MODEL.FEAT_DIM])
-answer_label_batch = tf.placeholder(tf.int32, [None])
-
 dropout_keep_prob = tf.placeholder(tf.float32, shape=())
 
-model = TrainingModel(input_seq_batch, seq_length_batch, image_feat_batch, answer_label_batch, num_vocab=num_vocab,
+model = TrainingModel(input_seq_batch, seq_length_batch, image_feat_batch, num_vocab=num_vocab,
                       num_choices=num_choices, module_names=module_names, dropout_keep_prob=dropout_keep_prob)
 
 # Loss function
@@ -67,6 +65,8 @@ if cfg.TRAIN.VQA_USE_SOFT_SCORE:
         tf.nn.sigmoid_cross_entropy_with_logits(
             logits=model.out.vqa_scores, labels=soft_score_batch))
 else:
+    answer_label_batch = tf.placeholder(tf.int32, [None])
+
     loss_vqa_per_sample = tf.nn.sparse_softmax_cross_entropy_with_logits(
         logits=model.out.vqa_scores, labels=answer_label_batch)
 
@@ -129,14 +129,16 @@ accuracy_ph = tf.placeholder(tf.float32, [])
 val_accuracy_ph = tf.placeholder(tf.float32, [])
 val_loss_vqa_ph = tf.placeholder(tf.float32, [])
 
-summary_trn = [tf.summary.scalar("loss/vqa", loss_vqa_ph),
-               tf.summary.scalar("loss/layout", loss_layout_ph),
-               tf.summary.scalar("loss/rec", loss_rec_ph),
-               tf.summary.scalar("eval/vqa/accuracy", accuracy_ph)]
+summary_trn = []
+summary_trn.append(tf.summary.scalar("loss/vqa", loss_vqa_ph))
+summary_trn.append(tf.summary.scalar("loss/layout", loss_layout_ph))
+summary_trn.append(tf.summary.scalar("loss/rec", loss_rec_ph))
+summary_trn.append(tf.summary.scalar("eval/vqa/accuracy", accuracy_ph))
 log_step_trn = tf.summary.merge(summary_trn)
 
-summary_val = [tf.summary.scalar("loss/val_vqa", val_loss_vqa_ph),
-               tf.summary.scalar("eval/vqa/val_accuracy", val_accuracy_ph)]
+summary_val = []
+summary_val.append(tf.summary.scalar("loss/val_vqa", val_loss_vqa_ph))
+summary_val.append(tf.summary.scalar("eval/vqa/val_accuracy", val_accuracy_ph))
 log_val = tf.summary.merge(summary_val)
 
 imdb_val_file = cfg.IMDB_FILE % cfg.VAL.SPLIT_VQA

@@ -220,13 +220,15 @@ class PreTrainModel:
 
 
 class TrainingModel:
-    def __init__(self, input_seq_batch, seq_length_batch, image_feat_batch, answer_label_batch,
-                 num_vocab, module_names, num_choices, dropout_keep_prob,
+    def __init__(self, inputs, num_vocab, module_names, num_choices,
                  scope='full_model', reuse=None):
         self.lr = tf.placeholder(tf.float32, shape=())
-        self.dropout_keep_prob = dropout_keep_prob
+        self.dropout_keep_prob = tf.placeholder(tf.float32, shape=())
 
-        self.answer_batch = answer_label_batch
+        self.answer_batch = inputs["answer"]
+        input_seq_batch = inputs["input_ids"]
+        seq_length_batch = inputs["seq_length"]
+        image_feat_batch = inputs["img_features"]
 
         input_seq_batch = tf.transpose(input_seq_batch, perm=[1, 0])
 
