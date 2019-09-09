@@ -21,11 +21,12 @@ max_len = 0
 
 def pad_imdb(imdb, max_len, name):
     print('padding imdb %s to %d' % (name, max_len))
-    for i in tqdm(range(len(imdb))):
-        question_tokens = imdb[i]['question_tokens']
-        pad_array = np.array([0] * (max_len - question_tokens.size))
-        imdb[i]['question_tokens'] = np.concatenate((question_tokens, pad_array))
-        assert len(imdb[i]['question_tokens']) == max_len, len(imdb[i]['question_tokens'])
+    for i, iminfo in tqdm(enumerate(imdb)):
+        question_tokens = iminfo['question_tokens']
+        pad_array = np.zeros(max_len - question_tokens.size)
+        iminfo['question_tokens'] = np.concatenate((question_tokens, pad_array))
+        assert len(iminfo['question_tokens']) == max_len, \
+            f"len(iminfo['question_tokens']) == {len(iminfo['question_tokens'])} should be max_len == {max_len}"
 
 
 def build_imdb(image_set):

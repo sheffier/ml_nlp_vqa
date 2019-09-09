@@ -23,6 +23,7 @@ def get_shape_list(tensor, name=None):
     """
 
     if name is None:
+        # TODO(erez) it's currently unused
         name = tensor.name
 
     shape = tensor.shape.as_list()
@@ -71,8 +72,8 @@ class PreTrainOutputs:
             # right_kb_batch_att = tf.reshape(model.right_kb_batch * model.nmn_right.att_last,
             #                                 (N * cfg.MODEL.H_FEAT * cfg.MODEL.W_FEAT, cfg.MODEL.KB_DIM))
 
-            left_kb_batch_att = model.left_kb_batch * model.nmn_left.att_last
-            right_kb_batch_att = model.right_kb_batch * model.nmn_right.att_last
+            left_kb_batch_att = model.kb_batch_left * model.nmn_left.att_last
+            right_kb_batch_att = model.kb_batch_right * model.nmn_right.att_last
 
             kb_batch_att = tf.concat((left_kb_batch_att, right_kb_batch_att), axis=2)
             kb_batch_att = tf.reshape(kb_batch_att, (N * cfg.MODEL.H_FEAT * cfg.MODEL.W_FEAT * 2, cfg.MODEL.KB_DIM))
@@ -219,15 +220,13 @@ class PreTrainModel:
 
 
 class TrainingModel:
-    def __init__(self, inputs, num_vocab, module_names, num_choices,
+    def __init__(self, input_seq_batch, seq_length_batch, image_feat_batch, answer_label_batch,
+                 num_vocab, module_names, num_choices, dropout_keep_prob,
                  scope='full_model', reuse=None):
         self.lr = tf.placeholder(tf.float32, shape=())
-        self.dropout_keep_prob = tf.placeholder(tf.float32, shape=())
+        self.dropout_keep_prob = dropout_keep_prob
 
-        self.answer_batch = inputs["answer"]
-        input_seq_batch = inputs["input_ids"]
-        seq_length_batch = inputs["seq_length"]
-        image_feat_batch = inputs["img_features"]
+        self.answer_batch = answer_label_batch
 
         input_seq_batch = tf.transpose(input_seq_batch, perm=[1, 0])
 
