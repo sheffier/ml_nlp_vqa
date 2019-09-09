@@ -59,7 +59,7 @@ def extract_dataset_resnet152_c5_7x7(image_dir, save_dir, ext_filter='*.png'):
             np.save(save_path, resnet152_c5_val)
 
 print(image_basedir)
-for image_set in ['train', 'dev', 'test']:
+for image_set in ['train', 'dev', 'test1']:
     print('Extracting image set ' + image_set)
     extract_dataset_resnet152_c5_7x7(
         os.path.join(image_basedir, image_set),

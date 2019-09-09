@@ -1,3 +1,4 @@
+from comet_ml import Experiment
 import argparse
 import os
 import json
@@ -18,10 +19,13 @@ assert cfg.EXP_NAME == os.path.basename(args.cfg).replace('.yaml', '')
 if args.opts:
     merge_cfg_from_list(args.opts)
 
+
+
 # Start session
 os.environ["CUDA_VISIBLE_DEVICES"] = str(cfg.GPU_ID)
 sess = tf.Session(config=tf.ConfigProto(
     gpu_options=tf.GPUOptions(allow_growth=cfg.GPU_MEM_GROWTH)))
+
 
 # Data files
 imdb_file = cfg.IMDB_FILE % cfg.TEST.SPLIT_VQA
@@ -37,7 +41,7 @@ module_names = data_reader.batch_loader.layout_dict.word_list
 # Eval files
 if cfg.TEST.GEN_EVAL_FILE:
     eval_file = cfg.TEST.EVAL_FILE % (
-        cfg.EXP_NAME, cfg.TEST.SPLIT_VQA, cfg.EXP_NAME, cfg.TEST.ITER)
+        cfg.EXP_NAME, cfg.TEST.SPLIT_VQA, cfg.EXP_NAME, cfg.TEST.MODEL_ITER_OR_NAME)
     print('evaluation outputs will be saved to %s' % eval_file)
     os.makedirs(os.path.dirname(eval_file), exist_ok=True)
     answer_word_list = data_reader.batch_loader.answer_dict.word_list
@@ -49,9 +53,10 @@ input_seq_batch = tf.placeholder(tf.int32, [None, None])
 seq_length_batch = tf.placeholder(tf.int32, [None])
 image_feat_batch = tf.placeholder(
     tf.float32, [None, cfg.MODEL.H_FEAT, cfg.MODEL.W_FEAT, cfg.MODEL.FEAT_DIM])
+dropout_keep_prob = tf.placeholder(tf.float32, shape=())
 model = Model(
     input_seq_batch, seq_length_batch, image_feat_batch, num_vocab=num_vocab,
-    num_choices=num_choices, module_names=module_names, is_training=False)
+    num_choices=num_choices, module_names=module_names, dropout_keep_prob=dropout_keep_prob)
 
 # Load snapshot
 if cfg.TEST.USE_EMV:
@@ -61,12 +66,12 @@ if cfg.TEST.USE_EMV:
         for v in tf.global_variables()}
 else:
     var_names = {v.op.name: v for v in tf.global_variables()}
-snapshot_file = cfg.TEST.SNAPSHOT_FILE % (cfg.EXP_NAME, cfg.TEST.ITER)
+snapshot_file = cfg.TEST.SNAPSHOT_FILE % (cfg.EXP_NAME, cfg.TEST.MODEL_ITER_OR_NAME)
 snapshot_saver = tf.train.Saver(var_names)
 snapshot_saver.restore(sess, snapshot_file)
 
 # Write results
-result_dir = cfg.TEST.RESULT_DIR % (cfg.EXP_NAME, cfg.TEST.ITER)
+result_dir = cfg.TEST.RESULT_DIR % (cfg.EXP_NAME, cfg.TEST.MODEL_ITER_OR_NAME)
 vis_dir = os.path.join(
     result_dir, 'vqa_%s_%s' % (cfg.TEST.VIS_DIR_PREFIX, cfg.TEST.SPLIT_VQA))
 os.makedirs(result_dir, exist_ok=True)
@@ -77,10 +82,25 @@ answer_correct, num_questions = 0, 0
 for n_batch, batch in enumerate(data_reader.batches()):
     fetch_list = [model.vqa_scores]
     answer_incorrect = num_questions - answer_correct
+    if cfg.TEST.VIS_SEPARATE_CORRECTNESS:
+        run_vis = (
+            answer_correct < cfg.TEST.NUM_VIS_CORRECT or
+            answer_incorrect < cfg.TEST.NUM_VIS_INCORRECT)
+    else:
+        run_vis = num_questions < cfg.TEST.NUM_VIS
+    if run_vis:
+        fetch_list.append(model.vis_outputs)
     fetch_list_val = sess.run(fetch_list, feed_dict={
             input_seq_batch: batch['input_seq_batch'],
             seq_length_batch: batch['seq_length_batch'],
-            image_feat_batch: batch['image_feat_batch']})
+            image_feat_batch: batch['image_feat_batch'],
+            dropout_keep_prob: 1.0})
+
+    # visualization
+    if run_vis:
+        model.vis_batch_vqa(
+            data_reader, batch, fetch_list_val[-1], num_questions,
+            answer_correct, answer_incorrect, vis_dir)
 
     # compute accuracy
     vqa_scores_val = fetch_list_val[0]
@@ -100,8 +120,8 @@ for n_batch, batch in enumerate(data_reader.batches()):
     num_questions += len(vqa_labels)
     accuracy = answer_correct / num_questions
     if n_batch % 20 == 0:
-        print('exp: %s, iter = %d, accumulated accuracy on %s = %f (%d / %d)' %
-              (cfg.EXP_NAME, cfg.TEST.ITER, cfg.TEST.SPLIT_VQA,
+        print('exp: %s, model name/iter = %s, accumulated accuracy on %s = %f (%d / %d)' %
+              (cfg.EXP_NAME, cfg.TEST.MODEL_ITER_OR_NAME, cfg.TEST.SPLIT_VQA,
                accuracy, answer_correct, num_questions))
 
 with open(eval_file, 'w') as f:
@@ -110,9 +130,14 @@ with open(eval_file, 'w') as f:
 
 with open(os.path.join(
         result_dir, 'vqa_results_%s.txt' % cfg.TEST.SPLIT_VQA), 'w') as f:
-    print('\nexp: %s, iter = %d, final accuracy on %s = %f (%d / %d)' %
-          (cfg.EXP_NAME, cfg.TEST.ITER, cfg.TEST.SPLIT_VQA,
+    print('\nexp: %s, model name/iter = %s, final accuracy on %s = %f (%d / %d)' %
+          (cfg.EXP_NAME, cfg.TEST.MODEL_ITER_OR_NAME, cfg.TEST.SPLIT_VQA,
            accuracy, answer_correct, num_questions))
-    print('exp: %s, iter = %d, final accuracy on %s = %f (%d / %d)' %
-          (cfg.EXP_NAME, cfg.TEST.ITER, cfg.TEST.SPLIT_VQA,
+
+    print('exp: %s, model name/iter = %s, final accuracy on %s = %f (%d / %d)' %
+          (cfg.EXP_NAME, cfg.TEST.MODEL_ITER_OR_NAME, cfg.TEST.SPLIT_VQA,
            accuracy, answer_correct, num_questions), file=f)
+
+experiment = Experiment(api_key="wZhhsEAf25MNhISJaDP50GDQg", project_name=cfg.EXP_NAME)
+
+experiment.log_metric("final accuracy on model name/iter %s" % (cfg.TEST.MODEL_ITER_OR_NAME), accuracy)

@@ -64,6 +64,8 @@ __C.MODEL.NMN.VALIDATE_MODULES = False
 __C.MODEL.NMN.HARD_MODULE_VALIDATION = False
 __C.MODEL.NMN.DESCRIBE_ONE = AttrDict()
 __C.MODEL.NMN.DESCRIBE_ONE.KEEP_STACK = False
+__C.MODEL.NMN.DESCRIBE_TWO = AttrDict()
+__C.MODEL.NMN.DESCRIBE_TWO.KEEP_STACK = False
 
 __C.MODEL.VQA_OUTPUT_DIM = 512
 __C.MODEL.VQA_OUTPUT_USE_QUESTION = True
@@ -111,6 +113,13 @@ __C.TRAIN.VQA_SCORE_INIT = 0.
 __C.TRAIN.VQA_USE_SOFT_SCORE = False
 
 # --------------------------------------------------------------------------- #
+# validation options
+# --------------------------------------------------------------------------- #
+__C.VAL = AttrDict()
+__C.VAL.SPLIT_VQA = 'dev'
+__C.VAL.BATCH_SIZE = 100
+
+# --------------------------------------------------------------------------- #
 # test options
 # --------------------------------------------------------------------------- #
 __C.TEST = AttrDict()
@@ -118,10 +127,10 @@ __C.TEST.BATCH_SIZE = 64
 __C.TEST.USE_EMV = True
 __C.TEST.SPLIT_VQA = 'test'  # TODO
 __C.TEST.SPLIT_LOC = 'REPLACE_THIS_WITH_GOOGLE_REF_TEST'
-__C.TEST.SNAPSHOT_FILE = './exp_nlvr/tfmodel/%s/%08d'
-__C.TEST.ITER = -1  # Needs to be supplied
+__C.TEST.SNAPSHOT_FILE = './exp_nlvr/tfmodel/%s/%s'
+__C.TEST.MODEL_ITER_OR_NAME = ""  # Needs to be supplied
 
-__C.TEST.RESULT_DIR = './exp_nlvr/results/%s/%08d'
+__C.TEST.RESULT_DIR = './exp_nlvr/results/%s/%s'
 __C.TEST.GEN_EVAL_FILE = True
 __C.TEST.EVAL_FILE = './exp_nlvr/eval_outputs/%s/nlvr_%s_%s_%s_results.json'
 __C.TEST.VIS_SEPARATE_CORRECTNESS = False

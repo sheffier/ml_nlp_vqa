@@ -7,7 +7,7 @@ from . import controller, nmn, input_unit, output_unit, vis
 
 class Model:
     def __init__(self, input_seq_batch, seq_length_batch, image_feat_batch,
-                 num_vocab, num_choices, module_names, is_training,
+                 num_vocab, num_choices, module_names, dropout_keep_prob,
                  scope='model', reuse=None):
         """
         Neual Module Networks v4 (the whole model)
@@ -41,7 +41,7 @@ class Model:
             if cfg.MODEL.BUILD_VQA:
                 self.vqa_scores = output_unit.build_output_unit_vqa(
                     q_encoding, self.nmn.mem_last, num_choices,
-                    apply_dropout=is_training)
+                    dropout_keep_prob=dropout_keep_prob)
             if cfg.MODEL.BUILD_LOC:
                 loc_scores, bbox_offset, bbox_offset_fcn = \
                     output_unit.build_output_unit_loc(
