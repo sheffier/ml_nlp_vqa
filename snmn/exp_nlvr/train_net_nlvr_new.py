@@ -84,7 +84,8 @@ if __name__ == "__main__":
     train_file_pattern = os.path.join(dataset_dir, 'train_*.tfrecord')
     val_file_pattern = os.path.join(dataset_dir, 'dev_*.tfrecord')
     next_batch_op, training_init_op, validation_init_op = prepare_dataset_iterators(train_file_pattern,
-                                                                                    val_file_pattern)
+                                                                                    val_file_pattern,
+                                                                                    batch_size=cfg.TRAIN.BATCH_SIZE)
 
     model = TrainingModel(next_batch_op, num_vocab, module_names, num_choices)
 

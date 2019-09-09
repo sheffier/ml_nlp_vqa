@@ -76,7 +76,8 @@ if __name__ == "__main__":
     val_filenames_ph = tf.placeholder(tf.string, shape=[None])
 
     next_batch_op, training_init_op, validation_init_op = prepare_mask_dataset_iterators(train_filenames_ph,
-                                                                                         val_filenames_ph)
+                                                                                         val_filenames_ph,
+                                                                                         batch_size=cfg.TRAIN.BATCH_SIZE)
 
     train_sampled_ds = RandomMaskedDataset(train_file_pattern, 5, 576)
     val_sampled_ds = RandomMaskedDataset(val_file_pattern, 5, 47)
