@@ -119,7 +119,7 @@ if __name__ == "__main__":
             pbar.set_postfix(iter=n_iter, epoch=0,
                              train_loss=train_loss_vqa, train_acc=train_accuracy,
                              train_acc_avg=train_avg_accuracy,
-                             val_loss=0., val_acc_last_epoch=val_accuracy)
+                             val_loss=0., val_acc_last_epoch=val_accuracy, val_acc_best=val_best_acc)
             for epoch in range(num_epochs):
                 sess.run(training_init_op)
                 while True:
@@ -143,7 +143,7 @@ if __name__ == "__main__":
                                              train_loss=train_loss_vqa, train_acc=train_accuracy,
                                              train_acc_avg=train_avg_accuracy,
                                              val_loss=0 if epoch == 0 else new_val_avg_loss,
-                                             val_acc_last_epoch=val_accuracy)
+                                             val_acc_last_epoch=val_accuracy, val_acc_best=val_best_acc)
 
                             experiment.log_metric("train/loss_vqa", train_loss_vqa, step=n_iter)
                             experiment.log_metric("train/acc", train_accuracy, step=n_iter)
@@ -189,7 +189,8 @@ if __name__ == "__main__":
                         pbar.set_postfix(iter=n_iter, epoch=epoch,
                                          train_loss=train_loss_vqa, train_acc=train_accuracy,
                                          train_acc_avg=train_avg_accuracy,
-                                         val_loss=new_val_avg_loss, val_acc_last_epoch=val_accuracy)
+                                         val_loss=new_val_avg_loss, val_acc_last_epoch=val_accuracy,
+                                         val_acc_best=val_best_acc)
 
                         experiment.log_metric("val/loss_vqa", new_val_avg_loss, step=n_iter)
                         experiment.log_metric("val/acc_last_epoch", val_accuracy, step=n_iter)
