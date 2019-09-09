@@ -1,5 +1,5 @@
 import tensorflow as tf
-from tensorflow import convert_to_tensor as to_T
+from tensorflow import convert_to_tensor as to_T, newaxis as ax
 from util.cnn import fc_layer as fc
 
 from . import controller, nmn, input_unit, output_unit, vis
@@ -166,7 +166,7 @@ class BaseModel:
             left_module_probs, right_module_probs = (tf.identity(self.module_prob_list) for _ in range(2))
             no_op_index = module_names.index('_NoOp')
             for lri, module_probs in enumerate((left_module_probs, right_module_probs)):
-                module_probs *= self.left_right_probs[:, :, lri]
+                module_probs *= self.left_right_probs[:, :, lri, ax]
                 module_probs += (1 - tf.reduce_sum(module_probs, axis=-1, keep_dims=True)
                                  ) * tf.one_hot([[no_op_index]], depth=module_probs.get_shape()[-1])
 
