@@ -14,38 +14,6 @@ from util import (text_processing, session)
 from util.nlvr_train.data_pipeline import prepare_dataset_iterators
 
 
-def model_metrics(model):
-    # Loss function
-    loss_vqa_per_sample = tf.nn.sparse_softmax_cross_entropy_with_logits(
-        logits=model.out.vqa_scores, labels=model.answer_batch)
-
-    loss_vqa_acumm = tf.reduce_sum(loss_vqa_per_sample)
-    loss_vqa = tf.reduce_mean(loss_vqa_per_sample)
-
-    if cfg.TRAIN.USE_GT_LAYOUT:
-        gt_layout_batch = tf.placeholder(tf.int32, [None, None])
-        loss_layout = tf.reduce_mean(
-            tf.nn.sparse_softmax_cross_entropy_with_logits(
-                logits=model.base_model.module_logits, labels=gt_layout_batch))
-    else:
-        loss_layout = tf.convert_to_tensor(0.)
-    loss_rec = model.out.rec_loss
-    loss_train = (loss_vqa * cfg.TRAIN.VQA_LOSS_WEIGHT +
-                  loss_layout * cfg.TRAIN.LAYOUT_LOSS_WEIGHT +
-                  loss_rec * cfg.TRAIN.REC_LOSS_WEIGHT)
-    loss_total = loss_train + cfg.TRAIN.WEIGHT_DECAY * model.l2_reg
-
-    solver = tf.train.AdamOptimizer(learning_rate=model.lr)
-    solver_op = solver.minimize(loss_total)
-    # Save moving average of parameters
-    ema = tf.train.ExponentialMovingAverage(decay=cfg.TRAIN.EMV_DECAY)
-    ema_op = ema.apply(model.params)
-    with tf.control_dependencies([solver_op]):
-        train_op = tf.group(ema_op)
-
-    return loss_total, loss_vqa, loss_vqa_acumm, loss_layout, loss_rec, train_op
-
-
 if __name__ == "__main__":
     tf.logging.set_verbosity(tf.logging.ERROR)
 
@@ -89,7 +57,7 @@ if __name__ == "__main__":
 
     model = TrainingModel(next_batch_op, num_vocab, module_names, num_choices)
 
-    loss_total, loss_vqa, loss_vqa_acumm, loss_layout, loss_rec, train_op = model_metrics(model)
+    loss_total, loss_vqa, loss_vqa_acumm, loss_layout, loss_rec, train_op = model.get_metrics()
 
     with tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=cfg.GPU_MEM_GROWTH))) as sess:
         session.init_session(sess)

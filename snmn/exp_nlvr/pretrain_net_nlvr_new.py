@@ -14,27 +14,6 @@ from util import (text_processing, session)
 from util.nlvr_train.data_pipeline import (prepare_mask_dataset_iterators, RandomMaskedDataset)
 
 
-def model_metrics(model):
-    # Loss function
-    masked_lm_loss_per_sample = tf.nn.sparse_softmax_cross_entropy_with_logits(
-        logits=model.out.masked_lm_scores, labels=model.out.masked_lm_labels)
-
-    masked_lm_loss_acumm = tf.reduce_sum(masked_lm_loss_per_sample)
-    loss_masked_lm = tf.reduce_mean(masked_lm_loss_per_sample)
-
-    loss_total = loss_masked_lm + cfg.TRAIN.WEIGHT_DECAY * model.l2_reg
-
-    solver = tf.train.AdamOptimizer(learning_rate=model.lr)
-    solver_op = solver.minimize(loss_total)
-    # Save moving average of parameters
-    ema = tf.train.ExponentialMovingAverage(decay=cfg.TRAIN.EMV_DECAY)
-    ema_op = ema.apply(model.params)
-    with tf.control_dependencies([solver_op]):
-        train_op = tf.group(ema_op)
-
-    return masked_lm_loss_acumm, loss_masked_lm, train_op
-
-
 if __name__ == "__main__":
     tf.logging.set_verbosity(tf.logging.ERROR)
 
@@ -84,7 +63,7 @@ if __name__ == "__main__":
 
     model = PreTrainModel(next_batch_op, num_vocab, module_names)
 
-    masked_lm_loss_acumm, loss_masked_lm, train_op = model_metrics(model)
+    masked_lm_loss_acumm, loss_masked_lm, train_op = model.get_metrics()
 
     with tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=cfg.GPU_MEM_GROWTH))) as sess:
         session.init_session(sess)
