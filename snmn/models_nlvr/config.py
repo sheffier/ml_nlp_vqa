@@ -276,7 +276,7 @@ def _check_and_coerce_cfg_value_type(value_a, value_b, key, full_key):
 
 def evaluate_final_cfg():
     NVIDIA_SMI_GPU_RE = re.compile(r"^\|\s*"
-                                   r"(?P<id>\d+)\s+TITAN"
+                                   r"(?P<id>\d+)\s+"
                                    r".*\r?\n.*"
                                    r"(?P<mem_usage>\d+\w+)\s*/\s*(?P<total_mem>\d+\w+)"
                                    r"\s*\|\s*"

@@ -18,7 +18,8 @@ FLAGS.max_predictions_per_seq = 8
 class RandomMaskedDataset(object):
     def __init__(self, file_pattern, n_dups, n_shards_per_dup):
         file_list = sorted(tf.gfile.Glob(file_pattern))
-        assert len(file_list) == n_dups * n_shards_per_dup
+        assert len(file_list) == n_dups * n_shards_per_dup, \
+            f"len(file_list) = {len(file_list)} should equal n_dups * n_shards_per_dup = {n_dups} * {n_shards_per_dup}"
 
         self.n_dups = n_dups
         self.n_shards_per_dup = n_shards_per_dup
