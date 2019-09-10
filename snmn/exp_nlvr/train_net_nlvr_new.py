@@ -54,7 +54,7 @@ if __name__ == "__main__":
     parser.add_argument('opts', default=None, nargs=argparse.REMAINDER)
     args = parser.parse_args()
     merge_cfg_from_file(args.cfg)
-    assert cfg.EXP_NAME == os.path.basename(args.cfg).replace('.yaml', '')
+    assert os.path.basename(args.cfg).replace('.yaml', '') in cfg.EXP_NAME
     if args.opts:
         merge_cfg_from_list(args.opts)
 
