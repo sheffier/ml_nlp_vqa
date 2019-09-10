@@ -63,15 +63,11 @@ class PreTrainOutputs:
                  masked_lm_ids_batch, masked_lm_positions_batch, masked_lm_weights_batch,
                  num_vocab, scope='pretrain_out', reuse=None):
         with tf.variable_scope(scope, reuse=reuse):
+            self.scope = tf.get_default_graph().get_name_scope()
             S = max_seq_len
             N = batch_size
 
             # (N*H*W , C)
-            # left_kb_batch_att = tf.reshape(model.left_kb_batch * model.nmn_left.att_last,
-            #                                (N * cfg.MODEL.H_FEAT * cfg.MODEL.W_FEAT, cfg.MODEL.KB_DIM))
-            # right_kb_batch_att = tf.reshape(model.right_kb_batch * model.nmn_right.att_last,
-            #                                 (N * cfg.MODEL.H_FEAT * cfg.MODEL.W_FEAT, cfg.MODEL.KB_DIM))
-
             left_kb_batch_att = model.kb_batch_left * model.nmn_left.att_last
             right_kb_batch_att = model.kb_batch_right * model.nmn_right.att_last
 
@@ -101,6 +97,11 @@ class PreTrainOutputs:
             t_mask = tf.where(tf.equal(masked_lm_weights_batch, mask_idx))
             self.masked_lm_labels = tf.gather_nd(masked_lm_ids_batch, t_mask)
             self.masked_lm_scores = tf.gather_nd(tf.reshape(out_scores, [N, max_pred, -1]), t_mask)
+
+    def get_variable_list(self):
+        vars = tf.trainable_variables(scope=self.scope)
+
+        return vars
 
 
 class TrainingOutputs:
@@ -218,6 +219,26 @@ class PreTrainModel:
 
             self.lengths = seq_length_batch
 
+    def get_metrics(self):
+        # Loss function
+        masked_lm_loss_per_sample = tf.nn.sparse_softmax_cross_entropy_with_logits(
+            logits=self.out.masked_lm_scores, labels=self.out.masked_lm_labels)
+
+        masked_lm_loss_acumm = tf.reduce_sum(masked_lm_loss_per_sample)
+        loss_masked_lm = tf.reduce_mean(masked_lm_loss_per_sample)
+
+        loss_total = loss_masked_lm + cfg.TRAIN.WEIGHT_DECAY * self.l2_reg
+
+        solver = tf.train.AdamOptimizer(learning_rate=self.lr)
+        solver_op = solver.minimize(loss_total)
+        # Save moving average of parameters
+        ema = tf.train.ExponentialMovingAverage(decay=cfg.TRAIN.EMV_DECAY)
+        ema_op = ema.apply(self.params)
+        with tf.control_dependencies([solver_op]):
+            train_op = tf.group(ema_op)
+
+        return masked_lm_loss_acumm, loss_masked_lm, train_op
+
 
 class TrainingModel:
     def __init__(self, inputs, num_vocab, module_names, num_choices,
@@ -261,6 +282,37 @@ class TrainingModel:
             if cfg.MODEL.BUILD_LOC:
                 self.vis_outputs['loc_scores'] = self.out.loc_scores
                 self.vis_outputs['bbox_offset'] = self.out.bbox_offset
+
+    def get_metrics(self):
+        # Loss function
+        loss_vqa_per_sample = tf.nn.sparse_softmax_cross_entropy_with_logits(
+            logits=self.out.vqa_scores, labels=self.answer_batch)
+
+        loss_vqa_acumm = tf.reduce_sum(loss_vqa_per_sample)
+        loss_vqa = tf.reduce_mean(loss_vqa_per_sample)
+
+        if cfg.TRAIN.USE_GT_LAYOUT:
+            gt_layout_batch = tf.placeholder(tf.int32, [None, None])
+            loss_layout = tf.reduce_mean(
+                tf.nn.sparse_softmax_cross_entropy_with_logits(
+                    logits=self.base_model.module_logits, labels=gt_layout_batch))
+        else:
+            loss_layout = tf.convert_to_tensor(0.)
+        loss_rec = self.out.rec_loss
+        loss_train = (loss_vqa * cfg.TRAIN.VQA_LOSS_WEIGHT +
+                      loss_layout * cfg.TRAIN.LAYOUT_LOSS_WEIGHT +
+                      loss_rec * cfg.TRAIN.REC_LOSS_WEIGHT)
+        loss_total = loss_train + cfg.TRAIN.WEIGHT_DECAY * self.l2_reg
+
+        solver = tf.train.AdamOptimizer(learning_rate=self.lr)
+        solver_op = solver.minimize(loss_total)
+        # Save moving average of parameters
+        ema = tf.train.ExponentialMovingAverage(decay=cfg.TRAIN.EMV_DECAY)
+        ema_op = ema.apply(self.params)
+        with tf.control_dependencies([solver_op]):
+            train_op = tf.group(ema_op)
+
+        return loss_total, loss_vqa, loss_vqa_acumm, loss_layout, loss_rec, train_op
 
     def bbox_offset_loss(self, bbox_ind_batch, bbox_offset_batch):
         if cfg.MODEL.BBOX_REG_AS_FCN:
