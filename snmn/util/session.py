@@ -5,7 +5,7 @@ sys.path.append('../')  # NOQA
 from models_nlvr.config import cfg
 
 
-def init_session(sess):
+def init_session(sess, model):
     sess.run(tf.global_variables_initializer())
 
     assert isinstance(cfg.TRAIN.INIT_SNAPSHOT_DICT, dict), "Snapshot configuration is not a dictionary"

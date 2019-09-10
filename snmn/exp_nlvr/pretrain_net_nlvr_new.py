@@ -70,7 +70,7 @@ if __name__ == "__main__":
     masked_lm_loss_acumm, loss_masked_lm, train_op = model.get_metrics()
 
     with tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=cfg.GPU_MEM_GROWTH))) as sess:
-        session.init_session(sess)
+        session.init_session(sess, model)
 
         # Save snapshot
         snapshot_dir = cfg.TRAIN.SNAPSHOT_DIR % cfg.EXP_NAME
