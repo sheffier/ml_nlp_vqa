@@ -10,7 +10,7 @@ from tqdm import tqdm
 from models_nlvr.config import (
     cfg, merge_cfg_from_file, merge_cfg_from_list, evaluate_final_cfg)
 from models_nlvr.model import TrainingModel
-from util import text_processing
+from util import (text_processing, session)
 from util.nlvr_train.data_pipeline import prepare_dataset_iterators
 
 
@@ -92,7 +92,7 @@ if __name__ == "__main__":
     loss_total, loss_vqa, loss_vqa_acumm, loss_layout, loss_rec, train_op = model_metrics(model)
 
     with tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=cfg.GPU_MEM_GROWTH))) as sess:
-        sess.run(tf.global_variables_initializer())
+        session.init_session(sess)
 
         # Save snapshot
         snapshot_dir = cfg.TRAIN.SNAPSHOT_DIR % cfg.EXP_NAME
