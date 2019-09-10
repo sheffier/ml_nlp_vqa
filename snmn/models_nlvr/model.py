@@ -68,11 +68,6 @@ class PreTrainOutputs:
             N = batch_size
 
             # (N*H*W , C)
-            # left_kb_batch_att = tf.reshape(model.left_kb_batch * model.nmn_left.att_last,
-            #                                (N * cfg.MODEL.H_FEAT * cfg.MODEL.W_FEAT, cfg.MODEL.KB_DIM))
-            # right_kb_batch_att = tf.reshape(model.right_kb_batch * model.nmn_right.att_last,
-            #                                 (N * cfg.MODEL.H_FEAT * cfg.MODEL.W_FEAT, cfg.MODEL.KB_DIM))
-
             left_kb_batch_att = model.kb_batch_left * model.nmn_left.att_last
             right_kb_batch_att = model.kb_batch_right * model.nmn_right.att_last
 
