@@ -1,17 +1,21 @@
 from comet_ml import Experiment
 import argparse
-import os
 import math
-import sys
+import os
 
 import numpy as np
 import tensorflow as tf
-from tqdm import tqdm
 from models_nlvr.config import (
     cfg, merge_cfg_from_file, merge_cfg_from_list, evaluate_final_cfg)
 from models_nlvr.model import PreTrainModel
+from tqdm import tqdm
 from util import (text_processing, session)
 from util.nlvr_train.data_pipeline import (prepare_mask_dataset_iterators, RandomMaskedDataset)
+
+
+class Stats:
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
 
 
 if __name__ == "__main__":
@@ -77,60 +81,64 @@ if __name__ == "__main__":
         out_variables_to_save = model.out.get_variable_list()
         out_snapshot_saver = tf.train.Saver(out_variables_to_save, max_to_keep=None)  # keep all snapshots
 
-        val_best_acc = 0.
-        val_best_epoch = 0
-        train_loss_vqa = 0.
-        train_accuracy = 0.
-        train_avg_accuracy = 0.
-        accuracy_decay = 0.99
-
-        new_val_avg_loss = 100.
-        old_val_avg_loss = 100.
-        val_accuracy = 0.
-
         n_iter = 0
         n_epochs = 100
         lr = cfg.TRAIN.SOLVER.LR
+        accuracy_decay = 0.99
 
-        with tqdm(total=math.ceil((train_sampled_ds.n_shards_per_dup * n_epochs * 150) / 128), file=sys.stdout) as pbar:
-            pbar.set_description('[%s]' % cfg.EXP_NAME)
-            pbar.set_postfix(iter=n_iter, epoch=0,
-                             train_loss=train_loss_vqa, train_acc=train_accuracy,
-                             train_acc_avg=train_avg_accuracy,
-                             val_loss=0., val_acc_last_epoch=val_accuracy, val_acc_best=val_best_acc)
-            for epoch in range(n_epochs):
-                sess.run(training_init_op, {train_filenames_ph: next(train_sampled_ds)})
+        train_stats = Stats(loss=0., acc=0., avg_acc=0.)
+        val_stats = Stats(loss=0., last_acc=0., best_acc=0., best_epoch=0)
 
-                while True:
-                    try:
-                        n_iter += 1
+        train_log = tqdm(position=0, bar_format='{desc}')
+        val_log = tqdm(position=1, bar_format='{desc}')
+        train_pbar = tqdm(total=math.ceil((train_sampled_ds.n_shards_per_dup * n_epochs * 150) / 128),
+                          desc=f'[{cfg.EXP_NAME}]', position=2)
 
-                        lm_scores_value, train_loss_vqa, masked_lm_labels_value, _ = sess.run(
-                            (model.out.masked_lm_scores, loss_masked_lm, model.out.masked_lm_labels,
-                             train_op),
-                            {model.lr: lr})
 
-                        # compute accuracy
-                        lm_predictions = np.argmax(lm_scores_value, axis=1)
-                        train_accuracy = np.mean(lm_predictions == masked_lm_labels_value)
-                        train_avg_accuracy += (1 - accuracy_decay) * (train_accuracy - train_avg_accuracy)
+        def update_train_log(t_stats):
+            train_log.set_description_str(f'[TRAIN_STATS] loss={t_stats.loss:2.4f}'
+                                          f' acc={t_stats.acc:2.4f} '
+                                          f' avg_acc={t_stats.avg_acc:2.4f}')
 
-                        pbar.update(1)
 
-                        # Add to TensorBoard summary
-                        if n_iter % cfg.TRAIN.LOG_INTERVAL == 0:
-                            pbar.set_postfix(iter=n_iter, epoch=epoch,
-                                             train_loss=train_loss_vqa, train_acc=train_accuracy,
-                                             train_acc_avg=train_avg_accuracy,
-                                             val_loss=0 if epoch == 0 else new_val_avg_loss,
-                                             val_acc_last_epoch=val_accuracy, val_acc_best=val_best_acc)
+        def update_val_log(v_stats):
+            val_log.set_description_str(f'[VAL_STATS] loss={v_stats.loss:2.4f}'
+                                        f' last_epoch_acc={v_stats.last_acc:2.4f}'
+                                        f' best_acc={v_stats.best_acc:2.4f} @epoch {v_stats.best_epoch:d}')
 
-                            experiment.log_metric("pretrain/train/loss_lm", train_loss_vqa, step=n_iter)
-                            experiment.log_metric("pretrain/train/acc", train_accuracy, step=n_iter)
-                            experiment.log_metric("pretrain/train/acc_avg", train_avg_accuracy, step=n_iter)
 
-                        if (n_iter % cfg.TRAIN.SNAPSHOT_INTERVAL == 0 or
-                                n_iter == cfg.TRAIN.MAX_ITER):
+        update_train_log(train_stats)
+        update_val_log(val_stats)
+
+        for epoch in range(n_epochs):
+            sess.run(training_init_op, {train_filenames_ph: next(train_sampled_ds)})
+            train_pbar.set_postfix(epoch=epoch)
+            while True:
+                try:
+                    n_iter += 1
+
+                    lm_scores_value, train_stats.loss, masked_lm_labels_value, _ = sess.run(
+                        (model.out.masked_lm_scores, loss_masked_lm, model.out.masked_lm_labels,
+                         train_op),
+                        {model.lr: lr})
+
+                    # compute accuracy
+                    lm_predictions = np.argmax(lm_scores_value, axis=1)
+                    train_stats.acc = np.mean(lm_predictions == masked_lm_labels_value)
+                    train_stats.avg_acc += (1 - accuracy_decay) * (train_stats.acc - train_stats.avg_acc)
+
+                    update_train_log(train_stats)
+                    val_log.refresh()
+                    train_pbar.update(1)
+
+                    # Add to TensorBoard summary
+                    if n_iter % cfg.TRAIN.LOG_INTERVAL == 0:
+                        experiment.log_metric("pretrain/train/loss_lm", train_stats.loss, step=n_iter)
+                        experiment.log_metric("pretrain/train/acc", train_stats.acc, step=n_iter)
+                        experiment.log_metric("pretrain/train/acc_avg", train_stats.avg_acc, step=n_iter)
+
+                    if (n_iter % cfg.TRAIN.SNAPSHOT_INTERVAL == 0 or
+                            n_iter == cfg.TRAIN.MAX_ITER):
                         try:
                             snapshot_file = os.path.join(snapshot_dir, 'base_' + str(n_iter))
                             base_snapshot_saver.save(sess, snapshot_file, write_meta_graph=False)
@@ -140,57 +148,66 @@ if __name__ == "__main__":
                             print(e.message, e.args)
                         except:
                             print("Could not save iteration snapshot")
-                    except tf.errors.OutOfRangeError:
-                        break
+                except tf.errors.OutOfRangeError:
+                    break
 
-                # run validation
-                sess.run(validation_init_op, {val_filenames_ph: next(val_sampled_ds)})
-                n_samples = 0
-                answer_correct = 0
-                val_avg_loss = 0.
-                while True:
-                    # As long as the iterator is not empty
-                    try:
-                        lm_scores_value, val_loss_masked_lm, masked_lm_labels_value = sess.run(
-                            (model.out.masked_lm_scores,
-                             masked_lm_loss_acumm,
-                             model.out.masked_lm_labels),
-                            {model.lr: lr})
+            # run validation
+            sess.run(validation_init_op, {val_filenames_ph: next(val_sampled_ds)})
+            n_samples = 0
+            answer_correct = 0
+            val_avg_loss = 0.
+            val_pbar = tqdm(total=math.ceil((val_sampled_ds.n_shards_per_dup * 150) / 128),
+                            desc='[VAL]', position=3)
 
-                        # compute accuracy
-                        lm_predictions = np.argmax(lm_scores_value, axis=1)
+            while True:
+                # As long as the iterator is not empty
+                try:
+                    lm_scores_value, val_loss_masked_lm, masked_lm_labels_value = sess.run(
+                        (model.out.masked_lm_scores,
+                         masked_lm_loss_acumm,
+                         model.out.masked_lm_labels),
+                        {model.lr: lr})
 
-                        n_samples += len(masked_lm_labels_value)
-                        answer_correct += np.sum(lm_predictions == masked_lm_labels_value)
-                        val_avg_loss += val_loss_masked_lm
-                    except tf.errors.OutOfRangeError:
-                        # Update the average loss for the epoch
-                        val_accuracy = answer_correct / n_samples
-                        old_val_avg_loss = new_val_avg_loss
-                        new_val_avg_loss = val_avg_loss / n_samples
+                    # compute accuracy
+                    lm_predictions = np.argmax(lm_scores_value, axis=1)
 
-                        if val_accuracy > val_best_acc:
-                            val_best_acc = val_accuracy
-                            val_best_epoch = epoch
-	                        try:
-	                            snapshot_file = os.path.join(snapshot_dir, "best_val_base")
-	                            base_snapshot_saver.save(sess, snapshot_file, write_meta_graph=False)
-	                            out_snapshot_saver.save(sess, os.path.join(snapshot_dir, "best_val_out"),
-	                                                    write_meta_graph=False)
-	                        except Exception as e:
-	                            print(e.message, e.args)
-	                        except:
-	                            print("Could not save iteration snapshot")
+                    n_samples += len(masked_lm_labels_value)
+                    answer_correct += np.sum(lm_predictions == masked_lm_labels_value)
+                    val_avg_loss += val_loss_masked_lm
 
-                        pbar.set_postfix(iter=n_iter, epoch=epoch,
-                                         train_loss=train_loss_vqa, train_acc=train_accuracy,
-                                         train_acc_avg=train_avg_accuracy,
-                                         val_loss=new_val_avg_loss, val_acc_last_epoch=val_accuracy,
-                                         val_acc_best=val_best_epoch)
+                    val_pbar.update(1)
+                    train_log.refresh()
+                    val_log.refresh()
+                except tf.errors.OutOfRangeError:
+                    # Update the average loss for the epoch
+                    val_stats.last_acc = answer_correct / n_samples
+                    val_stats.loss = val_avg_loss / n_samples
 
-                        experiment.log_metric("pretrain/val/loss_lm", new_val_avg_loss, step=n_iter)
-                        experiment.log_metric("pretrain/val/acc_last_epoch", val_accuracy, step=n_iter)
-                        experiment.log_metric("pretrain/val/best_acc", val_best_acc, step=n_iter)
-                        experiment.log_metric("pretrain/val/best_epoch", val_best_epoch, step=n_iter)
+                    if val_stats.last_acc > val_stats.best_acc:
+                        val_stats.best_acc = val_stats.last_acc
+                        val_stats.best_epoch = epoch
 
-                        break
+                        try:
+                            snapshot_file = os.path.join(snapshot_dir, "best_val_base")
+                            base_snapshot_saver.save(sess, snapshot_file, write_meta_graph=False)
+                            out_snapshot_saver.save(sess, os.path.join(snapshot_dir, "best_val_out"),
+                                                    write_meta_graph=False)
+                        except Exception as e:
+                            print(e.message, e.args)
+                        except:
+                            print("Could not save iteration snapshot")
+
+                    update_val_log(val_stats)
+
+                    experiment.log_metric("pretrain/val/loss_lm", val_stats.loss, step=n_iter)
+                    experiment.log_metric("pretrain/val/acc_last_epoch", val_stats.last_acc, step=n_iter)
+                    experiment.log_metric("pretrain/val/best_acc", val_stats.best_acc, step=n_iter)
+                    experiment.log_metric("pretrain/val/best_epoch", val_stats.best_epoch, step=n_iter)
+
+                    break
+
+            val_pbar.close()
+
+        train_pbar.close()
+        train_log.close()
+        val_log.close()
