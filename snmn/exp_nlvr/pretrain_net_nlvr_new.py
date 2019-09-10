@@ -92,8 +92,11 @@ if __name__ == "__main__":
         # Save snapshot
         snapshot_dir = cfg.TRAIN.SNAPSHOT_DIR % cfg.EXP_NAME
         os.makedirs(snapshot_dir, exist_ok=True)
-        variables_to_save = model.base_model.get_variable_list()
-        snapshot_saver = tf.train.Saver(variables_to_save, max_to_keep=None)  # keep all snapshots
+        base_variables_to_save = model.base_model.get_variable_list()
+        base_snapshot_saver = tf.train.Saver(base_variables_to_save, max_to_keep=None)  # keep all snapshots
+
+        out_variables_to_save = model.out.get_variable_list()
+        out_snapshot_saver = tf.train.Saver(out_variables_to_save, max_to_keep=None)  # keep all snapshots
 
         val_best_acc = 0.
         val_best_epoch = 0
@@ -149,8 +152,15 @@ if __name__ == "__main__":
 
                         if (n_iter % cfg.TRAIN.SNAPSHOT_INTERVAL == 0 or
                                 n_iter == cfg.TRAIN.MAX_ITER):
-                            snapshot_file = os.path.join(snapshot_dir, str(n_iter))
-                            snapshot_saver.save(sess, snapshot_file, write_meta_graph=False)
+                        try:
+                            snapshot_file = os.path.join(snapshot_dir, 'base_' + str(n_iter))
+                            base_snapshot_saver.save(sess, snapshot_file, write_meta_graph=False)
+                            out_snapshot_saver.save(sess, os.path.join(snapshot_dir, 'out_' + str(n_iter)),
+                                                    write_meta_graph=False)
+                        except Exception as e:
+                            print(e.message, e.args)
+                        except:
+                            print("Could not save iteration snapshot")
                     except tf.errors.OutOfRangeError:
                         break
 
@@ -183,8 +193,15 @@ if __name__ == "__main__":
                         if val_accuracy > val_best_acc:
                             val_best_acc = val_accuracy
                             val_best_epoch = epoch
-                            snapshot_file = os.path.join(snapshot_dir, "best_val")
-                            snapshot_saver.save(sess, snapshot_file, write_meta_graph=False)
+	                        try:
+	                            snapshot_file = os.path.join(snapshot_dir, "best_val_base")
+	                            base_snapshot_saver.save(sess, snapshot_file, write_meta_graph=False)
+	                            out_snapshot_saver.save(sess, os.path.join(snapshot_dir, "best_val_out"),
+	                                                    write_meta_graph=False)
+	                        except Exception as e:
+	                            print(e.message, e.args)
+	                        except:
+	                            print("Could not save iteration snapshot")
 
                         pbar.set_postfix(iter=n_iter, epoch=epoch,
                                          train_loss=train_loss_vqa, train_acc=train_accuracy,

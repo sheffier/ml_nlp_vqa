@@ -63,6 +63,7 @@ class PreTrainOutputs:
                  masked_lm_ids_batch, masked_lm_positions_batch, masked_lm_weights_batch,
                  num_vocab, scope='pretrain_out', reuse=None):
         with tf.variable_scope(scope, reuse=reuse):
+            self.scope = tf.get_default_graph().get_name_scope()
             S = max_seq_len
             N = batch_size
 
@@ -101,6 +102,11 @@ class PreTrainOutputs:
             t_mask = tf.where(tf.equal(masked_lm_weights_batch, mask_idx))
             self.masked_lm_labels = tf.gather_nd(masked_lm_ids_batch, t_mask)
             self.masked_lm_scores = tf.gather_nd(tf.reshape(out_scores, [N, max_pred, -1]), t_mask)
+
+    def get_variable_list(self):
+        vars = tf.trainable_variables(scope=self.scope)
+
+        return vars
 
 
 class TrainingOutputs:

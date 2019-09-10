@@ -152,8 +152,13 @@ if __name__ == "__main__":
 
                         if (n_iter % cfg.TRAIN.SNAPSHOT_INTERVAL == 0 or
                                 n_iter == cfg.TRAIN.MAX_ITER):
-                            snapshot_file = os.path.join(snapshot_dir, str(n_iter))
-                            snapshot_saver.save(sess, snapshot_file, write_meta_graph=False)
+                            try:
+                                snapshot_file = os.path.join(snapshot_dir, str(n_iter))
+                                snapshot_saver.save(sess, snapshot_file, write_meta_graph=False)
+                            except Exception as e:
+                                print(e.message, e.args)
+                            except:
+                                print("Could not save iteration snapshot")
                     except tf.errors.OutOfRangeError:
                         break
 
@@ -184,8 +189,14 @@ if __name__ == "__main__":
                         if val_accuracy > val_best_acc:
                             val_best_acc = val_accuracy
                             val_best_epoch = epoch
-                            snapshot_file = os.path.join(snapshot_dir, "best_val")
-                            snapshot_saver.save(sess, snapshot_file, write_meta_graph=False)
+
+                            try:
+                                snapshot_file = os.path.join(snapshot_dir, "best_val")
+                                snapshot_saver.save(sess, snapshot_file, write_meta_graph=False)
+                            except Exception as e:
+                                print(e.message, e.args)
+                            except:
+                                print("Could not save best snapshot")
 
                         pbar.set_postfix(iter=n_iter, epoch=epoch,
                                          train_loss=train_loss_vqa, train_acc=train_accuracy,
