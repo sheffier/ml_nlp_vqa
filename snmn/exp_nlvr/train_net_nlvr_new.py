@@ -69,9 +69,9 @@ if __name__ == "__main__":
     experiment.log_parameters(hyper_params)
 
     dataset_dir = './exp_nlvr/data/tfrecords/'
-    qst_vocab_file = './exp_nlvr/data/vocabulary_nlvr.txt'
-    ans_vocab_file = './exp_nlvr/data/answers_nlvr.txt'
-    layout_vocab_file = './exp_nlvr/data/vocabulary_layout.txt'
+    qst_vocab_file = cfg.VOCAB_QUESTION_FILE
+    ans_vocab_file = cfg.VOCAB_ANSWER_FILE
+    layout_vocab_file = cfg.VOCAB_LAYOUT_FILE
 
     qst_vocab_dict = text_processing.VocabDict(qst_vocab_file)
     ans_vocab_dict = text_processing.VocabDict(ans_vocab_file)
