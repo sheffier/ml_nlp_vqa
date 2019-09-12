@@ -1,5 +1,4 @@
 import re
-import codecs
 
 _SENTENCE_SPLIT_REGEX = re.compile(r'(\W+)')
 
@@ -11,7 +10,7 @@ def tokenize(sentence):
 
 
 def load_str_list(fname):
-    with codecs.open(fname, 'r', 'utf-8') as f:
+    with open(fname, 'r') as f:
         lines = f.readlines()
     lines = [l.strip() for l in lines]
     return lines
