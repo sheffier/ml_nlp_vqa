@@ -1,7 +1,7 @@
 import re
 
-_SENTENCE_SPLIT_REGEX = re.compile(r'(\W+)')
-NLVR2_TO_ASCII = str.maketrans({'\u203a': '', '\u2019': "'", '\u00e9': 'e'})
+_SENTENCE_SPLIT_REGEX = re.compile(r"(\W+)")  # |'s\b|n't\b)")
+NLVR2_TO_ASCII = str.maketrans({'\u203a': '', '\u2019': "'", '\u00e9': 'e'})  # = the only non-ascii chars in NLVR2
 
 
 def tokenize(sentence):
@@ -30,13 +30,13 @@ class VocabDict:
         return self.word_list[n_w]
 
     def word2idx(self, w):
-        if w in self.word2idx_dict:
-            return self.word2idx_dict[w]
-        elif self.UNK_idx is not None:
-            return self.UNK_idx
-        else:
-            raise ValueError('word %s not in dictionary (while dictionary does'
-                             ' not contain <unk>)' % w)
+        w = w.translate(NLVR2_TO_ASCII)
+        w = self.word2idx_dict.get(w, self.UNK_idx)
+        if w is not None:
+            return w
+
+        raise ValueError('word %s not in dictionary (while dictionary does'
+                         ' not contain <unk>)' % w)
 
     def tokenize_and_index(self, sentence):
         inds = [self.word2idx(w) for w in tokenize(sentence)]
