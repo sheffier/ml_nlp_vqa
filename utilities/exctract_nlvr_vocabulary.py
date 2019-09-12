@@ -23,7 +23,7 @@ def get_nlvr2_sentences():
                 sample = json.loads(line)
                 # TODO? synset = ' '.split(sample['synset'])
                 sentence = sample['sentence'].translate(str.maketrans({'\u203a': '', '\u2019': "'", '\u00e9': 'e'}))
-                return sentence
+                yield sentence
 
 
 if __name__ == '__main__':
