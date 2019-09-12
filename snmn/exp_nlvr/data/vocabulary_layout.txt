@@ -3,4 +3,6 @@ _Find
 _Transform
 _Filter
 _And
-_Describe
+_Or
+_DescribeOne
+_DescribeTwo

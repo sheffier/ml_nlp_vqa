@@ -12,7 +12,9 @@ MODULE_INPUT_NUM = {
     '_Transform': 1,
     '_Filter': 1,
     '_And': 2,
-    '_Describe': 1,
+    '_Or': 2,
+    '_DescribeOne': 1,
+    '_DescribeTwo': 2,
 }
 
 MODULE_OUTPUT_NUM = {
@@ -21,7 +23,9 @@ MODULE_OUTPUT_NUM = {
     '_Transform': 1,
     '_Filter': 1,
     '_And': 1,
-    '_Describe': 1,
+    '_Or': 1,
+    '_DescribeOne': 1,
+    '_DescribeTwo': 1,
 }
 
 
@@ -223,8 +227,30 @@ class NMN:
 
         return att_stack, stack_ptr, self.mem_zero
 
-    def Describe(self, att_stack, stack_ptr, mem_in, c_i, scope='Describe',
-                 reuse=None):
+    def Or(self, att_stack, stack_ptr, mem_in, c_i, scope='Or', reuse=None):
+        """
+        Take the union between two attention maps
+        """
+        with tf.variable_scope(scope, reuse=reuse):
+            # Get attention
+            #   1) Just take the elementwise maximum of the two inputs
+
+            # Pop from stack
+            att_in_2 = _read_from_stack(att_stack, stack_ptr)
+            stack_ptr = _move_ptr_bw(stack_ptr)
+            att_in_1 = _read_from_stack(att_stack, stack_ptr)
+            # stack_ptr = _move_ptr_bw(stack_ptr)  # cancel-out below
+
+            att_out = tf.maximum(att_in_1, att_in_2)
+
+            # Push to stack
+            # stack_ptr = _move_ptr_fw(stack_ptr)  # cancel-out above
+            att_stack = _write_to_stack(att_stack, stack_ptr, att_out)
+
+        return att_stack, stack_ptr, self.mem_zero
+
+    def DescribeOne(self, att_stack, stack_ptr, mem_in, c_i,
+                    scope='DescribeOne', reuse=None):
         """
         Describe using one input attention. Outputs zero attention.
         """
@@ -257,6 +283,43 @@ class NMN:
 
         return att_stack, stack_ptr, mem_out
 
+    def DescribeTwo(self, att_stack, stack_ptr, mem_in, c_i,
+                    scope='DescribeTwo', reuse=None):
+        """
+        Describe using two input attentions. Outputs zero attention.
+        """
+        with tf.variable_scope(scope, reuse=reuse):
+            # Update memory:
+            #   1) linearly map the controller vectors to the KB dimension
+            #   2) extract attended features from the input attention
+            #   3) elementwise multplication
+            #   2) linearly merge with previous memory vector, find memory
+            #      vector and control state
+
+            att_stack_old, stack_ptr_old = att_stack, stack_ptr  # make a copy
+            # Pop from stack
+            att_in_2 = _read_from_stack(att_stack, stack_ptr)
+            stack_ptr = _move_ptr_bw(stack_ptr)
+            att_in_1 = _read_from_stack(att_stack, stack_ptr)
+            # stack_ptr = _move_ptr_bw(stack_ptr)  # cancel-out below
+
+            c_mapped = fc('fc_c_mapped', c_i, output_dim=cfg.MODEL.KB_DIM)
+            kb_att_in_1 = _extract_softmax_avg(self.kb_batch, att_in_1)
+            kb_att_in_2 = _extract_softmax_avg(self.kb_batch, att_in_2)
+            elt_prod = tf.nn.l2_normalize(
+                c_mapped * kb_att_in_1 * kb_att_in_2, axis=-1)
+            mem_out = fc(
+                'fc_mem_out', tf.concat([c_i, mem_in, elt_prod], axis=1),
+                output_dim=self.mem_dim)
+
+            # Push to stack
+            # stack_ptr = _move_ptr_fw(stack_ptr)  # cancel-out above
+            att_stack = _write_to_stack(att_stack, stack_ptr, self.att_zero)
+
+            if cfg.MODEL.NMN.DESCRIBE_TWO.KEEP_STACK:
+                att_stack, stack_ptr = att_stack_old, stack_ptr_old
+
+        return att_stack, stack_ptr, mem_out
 
 def _move_ptr_fw(stack_ptr):
     """
