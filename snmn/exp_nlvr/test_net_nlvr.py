@@ -48,7 +48,7 @@ if cfg.TEST.GEN_EVAL_FILE:
     print('evaluation outputs will be saved to %s' % eval_file)
     os.makedirs(os.path.dirname(eval_file), exist_ok=True)
     answer_word_list = data_reader.batch_loader.answer_dict.word_list
-    #assert(answer_word_list[0] == '<unk>')
+    # assert(answer_word_list[0] == '<unk>')
     output_qids_answers = []
 
 # Inputs and model
@@ -142,6 +142,8 @@ with open(os.path.join(
           (cfg.EXP_NAME, cfg.TEST.MODEL_ITER_OR_NAME, cfg.TEST.SPLIT_VQA,
            accuracy, answer_correct, num_questions), file=f)
 
-experiment = Experiment(api_key="wZhhsEAf25MNhISJaDP50GDQg", project_name=cfg.EXP_NAME)
+experiment = Experiment(  # don't forget to export your COMET_API_KEY or set ~/.comet.config
+                        project_name=cfg.EXP_NAME,
+                        workspace='ml-nlp-vqa')
 
-experiment.log_metric("final accuracy on model name/iter %s" % (cfg.TEST.MODEL_ITER_OR_NAME), accuracy)
+experiment.log_metric("final accuracy on model name/iter %s" % cfg.TEST.MODEL_ITER_OR_NAME, accuracy)
