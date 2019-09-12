@@ -1,9 +1,9 @@
-EXP_NAME: separate-left-right
+EXP_NAME: dsnmn-t-ctrl6
 MODEL:
   H_FEAT: 7
   W_FEAT: 7
   FEAT_DIM: 2048
-  T_CTRL: 12
+  T_CTRL: 6
   NMN:
     STACK:
       LENGTH: 6
@@ -36,5 +36,6 @@ TEST:
   NUM_VIS_INCORRECT: 10
 
 USE_FIXED_WORD_EMBED: True
+VOCAB_LAYOUT_FILE: './exp_nlvr/data/vocabulary_layout_wo_desc2.txt'
 FIXED_WORD_EMBED_FILE: './exp_nlvr/data/vocabulary_nlvr_glove.npy'
 IMDB_FILE: './exp_nlvr/data/imdb_r152_7x7/imdb_%s.npy'
