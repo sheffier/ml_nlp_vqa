@@ -1,10 +1,11 @@
 import re
 
 _SENTENCE_SPLIT_REGEX = re.compile(r'(\W+)')
+NLVR2_TO_ASCII = str.maketrans({'\u203a': '', '\u2019': "'", '\u00e9': 'e'})
 
 
 def tokenize(sentence):
-    tokens = _SENTENCE_SPLIT_REGEX.split(sentence.lower())
+    tokens = _SENTENCE_SPLIT_REGEX.split(sentence.lower().translate(NLVR2_TO_ASCII))
     tokens = [t.strip() for t in tokens if len(t.strip()) > 0]
     return tokens
 

@@ -21,8 +21,8 @@ def get_nlvr2_sentences():
                 if not line:
                     continue
                 sample = json.loads(line)
-                # TODO? synset = ' '.split(sample['synset'])
-                sentence = sample['sentence'].translate(str.maketrans({'\u203a': '', '\u2019': "'", '\u00e9': 'e'}))
+                # synset = ' '.split(sample['synset'])
+                sentence = sample['sentence']
                 yield sentence
 
 
