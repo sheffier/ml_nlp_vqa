@@ -1,9 +1,10 @@
 import os
 import json
+import codecs
 from util.text_processing import tokenize
 
-NLVR2_DATA_DIR = '../nlvr2/data'
-OUTPUT_FILE = f'{__file__}/../snmn/exp_nlvr/data/vocabulary_nlvr.txt'
+NLVR2_DATA_DIR = '../../DATASETS/nlvr/nlvr2/data/'
+OUTPUT_FILE = f'../snmn/exp_nlvr/data/vocabulary_nlvr.txt'
 
 
 def get_nlvr2_tokens():
@@ -26,5 +27,5 @@ def get_nlvr2_sentences():
 
 
 if __name__ == '__main__':
-    with open(OUTPUT_FILE, 'w') as f:
+    with codecs.open(OUTPUT_FILE, 'w', 'utf-8') as f:
         f.writelines(sorted(get_nlvr2_tokens()))
