@@ -9,9 +9,7 @@ from models_nlvr.config import (
     cfg, merge_cfg_from_file, merge_cfg_from_list, evaluate_final_cfg)
 from util.nlvr_train.data_reader import DataReader
 
-
 tf.logging.set_verbosity(tf.logging.ERROR)
-
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--cfg', required=True)
@@ -23,7 +21,9 @@ if args.opts:
     merge_cfg_from_list(args.opts)
 evaluate_final_cfg()
 
-experiment = Experiment(api_key="wZhhsEAf25MNhISJaDP50GDQg", project_name=cfg.EXP_NAME)
+experiment = Experiment(  # don't forget to export your COMET_API_KEY or set ~/.comet.config
+                        project_name=cfg.EXP_NAME,
+                        workspace='ml-nlp-vqa')
 
 hyper_params = {"batch_size": cfg.TRAIN.BATCH_SIZE, "feature_dim": cfg.MODEL.FEAT_DIM}
 experiment.log_parameters(hyper_params)
@@ -117,16 +117,14 @@ accuracy_ph = tf.placeholder(tf.float32, [])
 val_accuracy_ph = tf.placeholder(tf.float32, [])
 val_loss_vqa_ph = tf.placeholder(tf.float32, [])
 
-summary_trn = []
-summary_trn.append(tf.summary.scalar("loss/vqa", loss_vqa_ph))
-summary_trn.append(tf.summary.scalar("loss/layout", loss_layout_ph))
-summary_trn.append(tf.summary.scalar("loss/rec", loss_rec_ph))
-summary_trn.append(tf.summary.scalar("eval/vqa/accuracy", accuracy_ph))
+summary_trn = [tf.summary.scalar("loss/vqa", loss_vqa_ph),
+               tf.summary.scalar("loss/layout", loss_layout_ph),
+               tf.summary.scalar("loss/rec", loss_rec_ph),
+               tf.summary.scalar("eval/vqa/accuracy", accuracy_ph)]
 log_step_trn = tf.summary.merge(summary_trn)
 
-summary_val = []
-summary_val.append(tf.summary.scalar("loss/val_vqa", val_loss_vqa_ph))
-summary_val.append(tf.summary.scalar("eval/vqa/val_accuracy", val_accuracy_ph))
+summary_val = [tf.summary.scalar("loss/val_vqa", val_loss_vqa_ph),
+               tf.summary.scalar("eval/vqa/val_accuracy", val_accuracy_ph)]
 log_val = tf.summary.merge(summary_val)
 
 imdb_val_file = cfg.IMDB_FILE % cfg.VAL.SPLIT_VQA
@@ -150,8 +148,8 @@ for n_batch, batch in enumerate(data_reader.batches()):
     if n_iter >= cfg.TRAIN.MAX_ITER:
         break
 
-    if ((n_iter+1) % n_iters_per_epoch == 0 or
-            (n_iter+1) == cfg.TRAIN.MAX_ITER):
+    if ((n_iter + 1) % n_iters_per_epoch == 0 or
+            (n_iter + 1) == cfg.TRAIN.MAX_ITER):
         val_loss_vqa = 0.
         answer_correct = 0
 
@@ -195,10 +193,10 @@ for n_batch, batch in enumerate(data_reader.batches()):
                   "accuracy (cur) = %f\n\t" % val_accuracy +
                   "best accuracy = %f at iter %d" % (best_val_acc, best_val_iter))
 
-            experiment.log_metric("[VAL] loss (vqa)", val_avg_loss, step = n_iter)
-            experiment.log_metric("[VAL] accuracy (cur)", val_accuracy, step = n_iter)
-            experiment.log_metric("[VAL] best accuracy", best_val_acc, step = n_iter)
-            experiment.log_metric("[VAL] best val iter", best_val_iter, step = n_iter)
+            experiment.log_metric("[VAL] loss (vqa)", val_avg_loss, step=n_iter)
+            experiment.log_metric("[VAL] accuracy (cur)", val_accuracy, step=n_iter)
+            experiment.log_metric("[VAL] best accuracy", best_val_acc, step=n_iter)
+            experiment.log_metric("[VAL] best val iter", best_val_iter, step=n_iter)
 
             val_avg_loss = 0.
 
@@ -220,30 +218,30 @@ for n_batch, batch in enumerate(data_reader.batches()):
     vqa_labels = batch['answer_label_batch']
     vqa_predictions = np.argmax(vqa_scores_val, axis=1)
     accuracy = np.mean(vqa_predictions == vqa_labels)
-    avg_accuracy += (1-accuracy_decay) * (accuracy-avg_accuracy)
+    avg_accuracy += (1 - accuracy_decay) * (accuracy - avg_accuracy)
 
     # Add to TensorBoard summary
-    if (n_iter+1) % cfg.TRAIN.LOG_INTERVAL == 0:
-        print("[TRAIN] exp: %s, iter = %d\n\t" % (cfg.EXP_NAME, n_iter+1) +
+    if (n_iter + 1) % cfg.TRAIN.LOG_INTERVAL == 0:
+        print("[TRAIN] exp: %s, iter = %d\n\t" % (cfg.EXP_NAME, n_iter + 1) +
               "loss (vqa) = %f, loss (layout) = %f, loss (rec) = %f\n\t" % (
-                loss_vqa_val, loss_layout_val, loss_rec_val) +
+                  loss_vqa_val, loss_layout_val, loss_rec_val) +
               "accuracy (cur) = %f, accuracy (avg) = %f" % (
-                accuracy, avg_accuracy))
+                  accuracy, avg_accuracy))
 
-        experiment.log_metric("[TRAIN] loss (vqa)", loss_vqa_val, step = n_iter)
-        experiment.log_metric("[TRAIN] accuracy (cur)", accuracy, step = n_iter)
-        experiment.log_metric("[TRAIN] accuracy (avg)", avg_accuracy, step = n_iter)
+        experiment.log_metric("[TRAIN] loss (vqa)", loss_vqa_val, step=n_iter)
+        experiment.log_metric("[TRAIN] accuracy (cur)", accuracy, step=n_iter)
+        experiment.log_metric("[TRAIN] accuracy (avg)", avg_accuracy, step=n_iter)
 
         summary = sess.run(log_step_trn, {
             loss_vqa_ph: loss_vqa_val,
             loss_layout_ph: loss_layout_val,
             loss_rec_ph: loss_rec_val,
             accuracy_ph: avg_accuracy})
-        log_writer.add_summary(summary, n_iter+1)
+        log_writer.add_summary(summary, n_iter + 1)
 
     # Save snapshot
-    if ((n_iter+1) % cfg.TRAIN.SNAPSHOT_INTERVAL == 0 or
-            (n_iter+1) == cfg.TRAIN.MAX_ITER):
-        snapshot_file = os.path.join(snapshot_dir, str(n_iter+1))
+    if ((n_iter + 1) % cfg.TRAIN.SNAPSHOT_INTERVAL == 0 or
+            (n_iter + 1) == cfg.TRAIN.MAX_ITER):
+        snapshot_file = os.path.join(snapshot_dir, str(n_iter + 1))
         snapshot_saver.save(sess, snapshot_file, write_meta_graph=False)
         print('snapshot saved to ' + snapshot_file)
