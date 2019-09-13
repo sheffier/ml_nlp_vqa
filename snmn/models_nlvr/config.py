@@ -15,7 +15,7 @@ cfg = __C
 # general options
 # --------------------------------------------------------------------------- #
 __C.EXP_NAME = '__default__'
-__C.RUN_NAME = None
+__C.RUN_NAME = ''
 __C.GPU_ID = "best"  # "best" is changed to best according to nvidia-smi
 __C.GPU_MEM_GROWTH = True
 
