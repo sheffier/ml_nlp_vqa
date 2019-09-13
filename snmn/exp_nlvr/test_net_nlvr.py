@@ -145,5 +145,7 @@ with open(os.path.join(
 experiment = Experiment(  # don't forget to export your COMET_API_KEY or set ~/.comet.config
                         project_name=cfg.EXP_NAME,
                         workspace='ml-nlp-vqa')
+if cfg.RUN_NAME:  # append `RUN_NAME <name>` to name the current experiment run
+    experiment.set_name(cfg.RUN_NAME)
 
 experiment.log_metric("final accuracy on model name/iter %s" % cfg.TEST.MODEL_ITER_OR_NAME, accuracy)

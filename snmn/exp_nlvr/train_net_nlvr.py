@@ -24,6 +24,8 @@ evaluate_final_cfg()
 experiment = Experiment(  # don't forget to export your COMET_API_KEY or set ~/.comet.config
                         project_name=cfg.EXP_NAME,
                         workspace='ml-nlp-vqa')
+if cfg.RUN_NAME:  # append `RUN_NAME <name>` to name the current experiment run
+    experiment.set_name(cfg.RUN_NAME)
 
 hyper_params = {"batch_size": cfg.TRAIN.BATCH_SIZE, "feature_dim": cfg.MODEL.FEAT_DIM}
 experiment.log_parameters(hyper_params)

@@ -31,9 +31,9 @@ class VocabDict:
 
     def word2idx(self, w):
         w = w.translate(NLVR2_TO_ASCII)
-        w = self.word2idx_dict.get(w, self.UNK_idx)
-        if w is not None:
-            return w
+        idx = self.word2idx_dict.get(w, self.UNK_idx)
+        if idx is not None:
+            return idx
 
         raise ValueError('word %s not in dictionary (while dictionary does'
                          ' not contain <unk>)' % w)
